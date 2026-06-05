@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMP3 — Sistem Informasi Monitoring Pemeriksaan Pajak</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/public/styles.css">
+  </head>
+
+  <body>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-badge">SIMP3</span>
+        <div class="logo-title">Sistem Monitoring P3</div>
+        <div class="logo-sub">KPP Pratama Jakarta Tanah Abang Dua — Admin</div>
+      </div>
+
+      <nav class="nav">
+        <div class="nav-section">Utama</div>
+          <div class="nav-item active" onclick="showPage('dashboard')">
+            <span class="nav-icon">◈</span> Dasbor
+          </div>
+        <div class="nav-item" onclick="showPage('kasus')">
+          <span class="nav-icon">⊡</span> Kasus Aktif
+        </div>
+        <div class="nav-item" onclick="showPage('assign')">
+          <span class="nav-icon">⊕</span>Assignment Manual
+        </div>
+        <div class="nav-section">Monitoring</div>
+        <div class="nav-item" onclick="showPage('bebankerja')">
+          <span class="nav-icon">≋</span> Beban Kerja
+        </div>
+        <div class="nav-item" onclick="showPage('deadline')">
+          <span class="nav-icon">◷</span> Jatuh Tempo
+        </div>
+        <div class="nav-section">Sistem</div>
+        <div class="nav-item" onclick="showPage('log')">
+          <span class="nav-icon">≡</span> Log Aktivitas
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-chip">
+          <div class="user-avatar">AD</div>
+          <div>
+            <div class="user-name">Admin P3</div>
+            <div class="user-role">Administrator</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="topbar">
+        <div class="topbar-title" id="page-title">Dasbor</div>
+
+        <div class="topbar-right">
+          <span id="api-connection" class="badge badge-red">● API Terputus</span>
+          <span style="font-size:11px; color:var(--text3); font-family:var(--mono)" id="current-time"></span>
+          <button class="btn btn-ghost btn-sm" onclick="refreshData()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- PAGE: DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div style="padding:24px;">
+          <select id="filter-tahun-pajak" class="form-select" onchange="filterTahunPajak()">
+            <option value="">Semua Tahun</option>
+
+            <option value="2026">2026</option>
+
+            <option value="2025">2025</option>
+
+            <option value="2024">2024</option>
+
+            <option value="2023">2023</option>
+
+            <option value="2022">2022</option>
+
+            <option value="2021">2021</option>
+            
+            <option value="2020">2020</option>
+          </select>
+
+          <div class="grid-4">
+            <div class="card">
+              <div class="card-title">Total NP2 Antri</div>
+              <div id="card-total-np2-antre" class="card-value" style="color:var(--blue)"></div>
+              <div class="card-sub">Belum di-assign ke tim</div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">Kasus Berjalan</div>
+              <div id="card-kasus-berjalan" class="card-value" style="color:var(--amber)"></div>
+              <div class="card-sub">SP2 — belum LHP</div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">Jatuh Tempo &lt; 30 Hari</div>
+              <div id="card-deadline-kurang-30-hari" class="card-value" style="color:var(--red)"></div>
+              <div class="card-sub">Perlu perhatian segera</div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">Total Potensi</div>
+              <div id="card-total-potensi" class="card-value" style="color:var(--green); font-size:20px"></div>
+              <div class="card-sub">Kasus aktif berjalan</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <div class="section-header">
+                <div>
+                  <div class="section-title">Distribusi Beban per Kelompok</div>
+
+                  <div class="section-sub">Berdasarkan jumlah kasus aktif</div>
+                </div>
+              </div>
+
+              <div id="dashboard-dist-k1" style="margin-bottom:20px;">
+                <div class="kelompok-header">
+                  <div>
+                    <div class="kh-name">Kelompok I</div>
+
+                    <div class="kh-spv">SPV: Kadi Wartono</div>
+                  </div>
+
+                  <span id="dashboard-total-k1" class="badge badge-amber">0 Kasus</span>
+                </div>
+
+                <div id="dashboard-bars-k1" class="bar-chart"></div>
+              </div>
+
+              <div id="dashboard-dist-k2">
+                <div class="kelompok-header">
+                  <div>
+                    <div class="kh-name">Kelompok II</div>
+
+                    <div class="kh-spv">SPV: Agus Sukoco</div>
+                  </div>
+
+                  <span id="dashboard-total-k2" class="badge badge-green">0 Kasus</span>
+                </div>
+
+                <div id="dashboard-bars-k2" class="bar-chart"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="section-header">
+                <div class="section-title">NP2 Antrian Terbaru</div>
+              </div>
+
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead><tr>
+                    <th>NP2</th><th>WP</th><th>Jenis</th><th>WP</th><th>Kode</th><th>Aksi</th>
+                  </tr></thead>
+
+                  <tbody id="antrean-table">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-header">
+              <div class="section-title">Jatuh Tempo Terdekat — Semua Kelompok</div>
+
+              <button class="btn btn-ghost btn-sm" onclick="showPage('deadline')">Lihat Semua →</button>
+            </div>
+
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr>
+                  <th>SP2</th><th>NP2</th><th>Nama WP</th><th>Tim</th><th>Jatuh Tempo</th><th>Sisa</th><th>Status</th>
+                </tr></thead>
+                
+                <tbody id="tabel-jatuh-tempo-terdekat">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: KASUS AKTIF -->
+      <div class="page" id="page-kasus">
+        <div style="padding:24px;">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Kasus Aktif per Tim</div>
+              <div class="section-sub">Data SP2 yang sedang berjalan (belum LHP)</div>
+            </div>
+          </div>
+
+          <div class="tabs">
+            <div class="tab active" onclick="switchTab(this,'all')">Semua Tim</div>
+
+            <div class="tab" onclick="switchTab(this,'k1')">Kelompok I</div>
+
+            <div class="tab" onclick="switchTab(this,'k2')">Kelompok II</div>
+          </div>
+
+          <div class="filter-bar">
+            <input type="text" placeholder="Cari NPWP / Nama WP / SP2..." id="search-kasus" oninput="filterKasus()">
+
+            <select id="filter-jenis" onchange="filterKasus()">
+              <option value="">Semua Jenis</option>
+
+              <option value="khusus">Khusus</option>
+
+              <option value="rutin">Rutin</option>
+            </select>
+
+            <select id="filter-tim" onchange="filterKasus()">
+              <option value="">Semua Tim</option>
+              <option value="Tim I-A">Tim I-A</option>
+              <option value="Tim I-B">Tim I-B</option>
+              <option value="Tim I-C">Tim I-C</option>
+              <option value="Tim II-A">Tim II-A</option>
+              <option value="Tim II-B">Tim II-B</option>
+              <option value="Tim II-C">Tim II-C</option>
+            </select>
+          </div>
+
+          <div class="card">
+            <div class="tbl-wrap">
+              <table class="tbl" id="kasus-table">
+                <thead>
+                  <tr>
+                    <th>SP2</th><th>NPWP</th><th>Nama WP</th><th>Jenis</th><th>WP Type</th>
+                    <th>Kode</th>
+                    <th>Tim</th><th>Kelompok</th><th>Tgl SP2</th><th>Jatuh Tempo</th><th>Potensi (Rp)</th><th>Proses</th><th>Aksi</th>
+                  </tr>
+                </thead>
+
+                <tbody id="kasus-tbody">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: ASSIGNMENT MANUAL -->
+      <div class="page" id="page-assign">
+        <div style="padding:24px;">
+          <div class="section-header">
+            <div>
+              <div class="section-title"><i>Assignment</i> Manual</div>
+              <div class="section-sub">Assign kasus dari tabel NP2 belum SP2 ke tim pemeriksa</div>
+            </div>
+
+            <button class="btn btn-primary" onclick="autoAssignAll()">⚡ Auto-Assign Semua</button>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <div style="display: flex; flex-direction: row; justify-content: space-between;">
+                <div style="display: flex; flex-direction: row; justify-content: space-between; width: 100%;">
+                  <div class="section-title" style="margin-bottom:8px;">📋 Antrian NP2 Belum Diassign</div>
+
+                  <input id="input-file" class="form-input" type="file" accept=".csv,text/csv" onchange="handleFileUpload(event)" style="margin-bottom: 0.5rem; width: fit-content;"/>
+                </div>
+              </div>
+
+              <div class="filter-bar">
+                <input type="text" placeholder="Cari NP2 / Nama WP..." id="search-antri" oninput="filterAntrian()" style="width:100%">
+              </div>
+
+              <div class="tbl-wrap" style="max-height:40rem; overflow-y:auto;">
+                <table class="tbl" id="antrian-full-table">
+                  <thead><tr>
+                    <th>NP2</th><th>Nama WP</th><th>Jenis</th><th>Tipe WP</th><th>Potensi</th><th>Kode</th><th>Skor</th><th>Aksi</th>
+                  </tr></thead>
+
+                  <tbody id="antrian-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="section-title" style="margin-bottom:12px;">👥 Status Beban Kerja Tim</div>
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                <div class="kelompok-header"><div><div class="kh-name">Kelompok I — SPV: Kadi Wartono</div></div></div>
+                <div id="tim-cards-k1"></div>
+                <div class="kelompok-header" style="margin-top:8px;"><div><div class="kh-name">Kelompok II — SPV: Agus Sukoco</div></div></div>
+                <div id="tim-cards-k2"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: BEBAN KERJA -->
+      <div class="page" id="page-bebankerja">
+        <div style="padding:24px;">
+          <div class="section-title" style="margin-bottom:20px;">Analisis Beban Kerja</div>
+          <div class="grid-4" style="margin-bottom:24px;">
+            <div class="card">
+              <div class="card-title">Total Kasus Kelompok I</div>
+              <div id="card-kasus-k1" class="card-value" style="color:var(--blue)">0</div>
+              <div class="card-sub">SPV: Kadi Wartono</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Total Kasus Kelompok II</div>
+              <div id="card-kasus-k2" class="card-value" style="color:var(--teal)">0</div>
+              <div class="card-sub">SPV: Agus Sukoco</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Rata-rata per Tim</div>
+              <div id="card-rerata-kasus" class="card-value" style="color:var(--amber)">0</div>
+              <div class="card-sub">Dari 6 tim aktif</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Tim Beban Terberat</div>
+              <div id="card-beban-terberat" class="card-value" style="color:var(--red); font-size:20px">—</div>
+              <div id="card-beban-terberat-sub" class="card-sub">—</div>
+            </div>
+          </div>
+          <div class="team-grid">
+            <div id="beban-kelompok1"></div>
+            <div id="beban-kelompok2"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: DEADLINE -->
+      <div class="page" id="page-deadline">
+        <div style="padding:24px;">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Monitoring Jatuh Tempo LHP Kasus</div>
+              <div class="section-sub">Urut berdasarkan jatuh tempo terdekat</div>
+            </div>
+            
+            <div style="display:flex; gap:8px;">
+              <span class="badge badge-red">● &lt;14 hari:<p id="dl-kurang-14-hari" ></p>kasus</span>
+              <span class="badge badge-amber">● 14-30 hari: <p id="dl-14-30-hari"></p>>kasus</span>
+              <span class="badge badge-green">● &gt;30 hari: <p id="dl-lebih-30-hari"></p>kasus</span>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <div class="section-title" style="margin-bottom:12px;">Kelompok I</div>
+              <div id="deadline-k1"></div>
+            </div>
+
+            <div class="card">
+              <div class="section-title" style="margin-bottom:12px;">Kelompok II</div>
+              <div id="deadline-k2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: LOG -->
+      <div class="page" id="page-log">
+        <div style="padding:24px;">
+          <div class="section-header">
+            <div class="section-title">Log Aktivitas</div>
+            <button class="btn btn-ghost btn-sm">↓ Export CSV</button>
+          </div>
+          <div class="filter-bar">
+            <input type="text" placeholder="Cari log..." style="width:220px">
+            <select>
+              <option>Semua Aksi</option>
+              <option>Assignment</option>
+              <option>Auto-Assign</option>
+              <option>Edit</option>
+              <option>Hapus</option>
+            </select>
+
+            <select>
+              <option>Semua Tim</option>
+              <option>Tim I-A</option><option>Tim I-B</option><option>Tim I-C</option>
+              <option>Tim II-A</option><option>Tim II-B</option><option>Tim II-C</option>
+            </select>
+          </div>
+          <div class="card">
+            <div class="log-list" id="log-list"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- MODAL: ASSIGN -->
+    <div class="modal-overlay" id="modal-assign">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">Assign Kasus ke Tim</div>
+
+          <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-assign')">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="card" style="margin-bottom:16px; background:var(--bg3);">
+            <div class="info-grid">
+              <div class="info-row"><div class="info-label">NP2</div><div class="info-value mono" id="modal-np2">—</div></div>
+              <div class="info-row"><div class="info-label">Nama WP</div><div class="info-value" id="modal-wp">—</div></div>
+              <div class="info-row"><div class="info-label">Jenis Pemeriksaan</div><div class="info-value" id="modal-jenis">—</div></div>
+              <div class="info-row"><div class="info-label">Tipe WP</div><div class="info-value" id="modal-tipe">—</div></div>
+              <div class="info-row"><div class="info-label">Nominal Potensi</div><div class="info-value" id="modal-potensi">—</div></div>
+              <div class="info-row"><div class="info-label">Kode Pemeriksaan</div><div class="info-value" id="modal-skor">—</div></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Kelompok</label>
+
+            <select class="form-select" id="sel-kelompok" onchange="updateTimOptions()">
+              <option value="">— Pilih Kelompok —</option>
+              <option value="k1">Kelompok I — SPV: Kadi Wartono</option>
+              <option value="k2">Kelompok II — SPV: Agus Sukoco</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tim</label>
+            <select class="form-select" id="sel-tim">
+              <option value="">— Pilih Tim —</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Rekomendasi Sistem</label>
+          
+            <div class="card" style="background:var(--blue-bg); border-color:var(--blue-dim);">
+              <div style="font-size:12px; color:var(--blue)">⚡ Sistem merekomendasikan: <strong id="rekomendasi-tim">Tim I-C</strong> (beban terendah: kasus)</div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Catatan</label>
+          
+            <textarea class="form-textarea" placeholder="Catatan assignment (opsional)..."></textarea>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal('modal-assign')">Batal</button>
+        
+          <button class="btn btn-primary" onclick="confirmAssign()">✓ Konfirmasi Assignment</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Login Portal P2 -->
+    <div class="modal-overlay" id="modal-login-portal-p2">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">Cek Cookie/Kredensial</div>
+
+          <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-login-portal-p2')" title="Tutup">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <input class="form-input" id="input-cookie" placeholder="Masukkan cookie" type="text"/>
+
+        </div>
+        
+        <div class="modal-footer">
+          <button id="tombol-cek-cookie" class="btn btn-ghost" onclick="cekCookie()" title="Cek Cookie">Cek</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: DETAIL KASUS -->
+    <div class="modal-overlay" id="modal-detail">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title" id="detail-title">Detail Kasus</div>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-detail')">✕</button>
+        </div>
+        
+        <div class="modal-body" id="detail-body"></div>
+
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Tutup</button>
+          
+          <button class="btn btn-danger btn-sm">⚑ Tandai Perhatian</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast">
+      <span id="toast-icon"></span>
+      <span id="toast-msg">Berhasil</span>
+    </div>
+
+    <script src="/public/script.js">
+    </script>
+  </body>
+</html>

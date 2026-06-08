@@ -119,14 +119,21 @@ function renderAntrianTabel(data) {
             <td>${a.skor}</td>
             
             <td>
-                <button class="btn btn-primary btn-sm" onclick="openAssign('${a.nama}','${a.np2}','${a.jenis}','${a.tipe}','${a.potensi.toLocaleString ? a.potensi.toLocaleString('id-ID', {
+                <button class="btn btn-primary btn-sm" title="Assign" onclick="openAssign('
+                ${a.nama}','
+                ${a.np2}','
+                ${a.jenis}','
+                ${a.tipe}','
+                ${a.potensi.toLocaleString ? a.potensi.toLocaleString('id-ID', {
                     style: 'currency',
                     currency: 'IDR',
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 0,
-                }) : a.potensi}','${a.kode}')">Assign</button>
+                }) : a.potensi}','
+                ${a.kode}',
+                '${a.skor}')">Assign</button>
                 
-                <button class="btn ${a.isProminent ? 'btn-success' : 'btn-danger'} btn-sm" style="margin-left:0.5rem;" title="Prominent People" onClick="setIsProminent(${index})">${a.isProminent ? 'Prominent ✓' : 'Mark Prominent'}</button>
+                <button class="btn ${a.isProminent ? 'btn-success' : 'btn-danger'} btn-sm" style="margin-left:0.5rem;" title="Prominent People" onClick="setIsProminent(${index})">${a.isProminent ? 'Prominent ✓' : '⚑'}</button>
             </td>
         </tr>
     `).join('');
@@ -284,6 +291,7 @@ function renderDashboard() {
 
     renderAntreanDashboard(filteredAntrian);
     renderDistribusiBeban();
+    renderDeadlineNearbyTable(filteredKasus);
 }
 
 function filterTahunPajak() {
@@ -316,6 +324,35 @@ function renderDistribusiBeban() {
             `;
         }).join('');
     });
+}
+
+function renderDeadlineNearbyTable(data) {
+    const tbody = document.getElementById('tabel-jatuh-tempo-terdekat');
+    if (!tbody) return;
+
+    const deadlineRows = (data || [])
+        .map(item => ({
+            ...item,
+            sisaHari: calculateSisaHari(item.jatuhTempo)
+        }))
+        .filter(item => item.sisaHari >= 0)
+        .sort((a, b) => a.sisaHari - b.sisaHari)
+        .slice(0, 8);
+
+    tbody.innerHTML = deadlineRows.map(item => {
+        const status = item.proses || '—';
+        return `
+            <tr>
+                <td class="mono">${item.sp2 || '—'}</td>
+                <td class="mono">${item.np2 || item.npwp || '—'}</td>
+                <td>${item.nama || '—'}</td>
+                <td>${item.tim || '—'}</td>
+                <td class="mono">${item.jatuhTempo || '—'}</td>
+                <td>${item.sisaHari}</td>
+                <td><span class="chip" style="color:${statusColor(status)};border-color:${statusColor(status)}40;background:${statusColor(status)}20">${status}</span></td>
+            </tr>
+        `;
+    }).join('');
 }
 
 function parseCSV(text) {
@@ -518,7 +555,7 @@ function updateTeamWorkloadFromSp2() {
         }
     });
 }
-
+ 
 // NP2 Belum SP2 functions
 function handleFileUpload(event) {
     const file = event.target.files?.[0];
@@ -563,7 +600,13 @@ function handleFileUpload(event) {
             const jenis = jenisRaw ? jenisRaw.trim() : 'Rutin';
             const potensiRaw = lookupCSVField(row, ['potensi']);
             const potensi = potensiRaw || '0';
-            const kode = lookupCSVField(row, ['kode pemeriksaan', 'kode', 'kd klu']);
+            let kode = Number(lookupCSVField(row, ['kode pemeriksaan', 'kode', 'kd klu']));
+            kode = kode == 1462 || kode == 1461 || kode == 1452 || kode == 1451? "Pemsus DSPP" : 
+                        (kode == 1162 || kode == 1172 || kode == 1171 ? "Rutin DSPP" : 
+                            (kode == 1122 || kode == 1121? "Rutin Non LB (Likuidasi)" :
+                                (kode == 1182 || kode == 1181 || kode == 2182? "Rutin LB" : "Lainnya")
+                            )
+                        );
             const tanggalNp2 = lookupCSVField(row, ['tanggal np2', 'tanggal np2', 'tanggal np2']);
             const tanggalUsulan = lookupCSVField(row, ['tanggal usulan instruksi', 'tanggal usulan']);
             const noUsulan = lookupCSVField(row, ['no usulan instruksi', 'no usulan']);
@@ -572,10 +615,12 @@ function handleFileUpload(event) {
             const kanwil = lookupCSVField(row, ['kanwil']);
             const tipe = lookupCSVField(row, ['kode pemeriksaan']).at(-1) === '1' ? 'WP Badan' : 'WP OP';
             const potensiNumber = Number(String(potensi).replace(/[^0-9.-]/g, ''));
-            const skor = Number.isNaN(potensiNumber) ? 0 : Math.min(99, Math.max(0, Math.round(potensiNumber / 10000000)));
+            const skor = menghitungBebanKerja(row, true);;
 
             imported.push({ np2, npwp, nama, jenis, kode, tipe, potensi, skor, baseSkor: skor, tanggalNp2, tanggalUsulan, noUsulan, masa, up2, kanwil, isProminent: false });
             TOTAL_KASUS += 1;
+            timData.k1.forEach(t => t.maxKasus = (TOTAL_KASUS / 6).toFixed(0));
+            timData.k2.forEach(t => t.maxKasus = (TOTAL_KASUS / 6).toFixed(0));
             existingNp2.add(np2);
         });
 
@@ -661,6 +706,7 @@ function renderAntreanDashboard(data) {
             <td>${renderJenisBadge(a.jenis)}</td>
             <td>${String(a.tipe).toLowerCase().includes('badan') ? '<span class="badge badge-purple">Badan</span>' : '<span class="badge badge-gray">OP</span>'}</td>
             <td>${renderKodeBadge(a.kode)}</td>
+            <td>${a.skor}</td>
             <td><button class="btn btn-primary btn-sm" onclick="openAssign('${a.nama}','${a.np2}','${a.jenis}','${a.tipe}','${a.potensi}','${a.kode}')">Assign</button></td>
         </tr>
     `).join('');
@@ -680,7 +726,7 @@ function renderTimCards(kelompok, containerId) {
             <div style="background:var(--bg4); border:1px solid var(--border); border-radius:var(--radius); padding:10px; margin-bottom:8px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                     <span style="font-size:12px; font-weight:600;">${t.name}</span>
-                    <span class="badge" style="background:${barColor}20; color:${barColor}">${t.kasus}/${t.maxKasus.toFixed(0)} Kasus</span>
+                    <span class="badge" style="background:${barColor}20; color:${barColor}">${t.kasus}/${t.maxKasus} Kasus</span>
                 </div>
 
                 <div class="progress-bar" style="margin-bottom:6px;"><div class="progress-fill" style="width:${pct}%; background:${barColor}"></div></div>
@@ -919,7 +965,7 @@ function filterAntrian() {
 }
 
 // ========== MODALS ==========
-function openAssign(nama, np2, jenis='KHUSUS', tipe='WP Badan', potensi='—', skor='—') {
+function openAssign(nama, np2, jenis='KHUSUS', tipe='WP Badan', potensi='—', kode = '—', skor='—') {
     currentAssignNP2 = np2;
 
     document.getElementById('modal-np2').textContent = np2;
@@ -938,6 +984,10 @@ function openAssign(nama, np2, jenis='KHUSUS', tipe='WP Badan', potensi='—', s
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
     });
+
+    document.getElementById('modal-skor').textContent = skor;
+
+    document.getElementById('modal-kode').textContent = np2BelumSp2Data.find(item => item.np2 === np2)?.kode || '—';
 
     document.getElementById('sel-kelompok').value = '';
 

@@ -4,15 +4,15 @@ var TOTAL_KASUS = 0;
 // ========== DATA ==========
 let = timData = {
     k1: [
-        { id:'tim-ia', name:'Tim I-A', ketua:'Eko Adrianto', anggota:'Rio Nugraha Putra', kasus:0, maxKasus:TOTAL_KASUS/6, bebanKerja:0 },
-        { id:'tim-ib', name:'Tim I-B', ketua:'Sumanty Elisabeth M', anggota:'Aulia Rahman Hakim', kasus:0, maxKasus:TOTAL_KASUS/6, bebanKerja:0 },
-        { id:'tim-ic', name:'Tim I-C', ketua:'Purwoko Erie Dharmawan', anggota:'Yoga Esthi Nugraha', kasus:0, maxKasus:TOTAL_KASUS/6, bebanKerja:0 },
+        { id:'tim-ia', name:'Tim I-A', ketua:'Eko Adrianto', anggota:'Rio Nugraha Putra', kasus:0, maxKasus:(TOTAL_KASUS/6).toFixed(0), bebanKerja:0 },
+        { id:'tim-ib', name:'Tim I-B', ketua:'Sumanty Elisabeth M', anggota:'Aulia Rahman Hakim', kasus:0, maxKasus:(TOTAL_KASUS/6).toFixed(0), bebanKerja:0 },
+        { id:'tim-ic', name:'Tim I-C', ketua:'Purwoko Erie Dharmawan', anggota:'Yoga Esthi Nugraha', kasus:0, maxKasus:(TOTAL_KASUS/6).toFixed(0), bebanKerja:0 },
     ],
 
     k2: [
-        { id:'tim-iia', name:'Tim II-A', ketua:'Wildan Kristianto', anggota:'Robiansyah', kasus: 0, maxKasus:TOTAL_KASUS/6, bebanKerja:0 },
-        { id:'tim-iib', name:'Tim II-B', ketua:'Heni Maryati', anggota:'Dimas Nugroho', kasus:0, maxKasus:TOTAL_KASUS/6, bebanKerja:0 },
-        { id:'tim-iic', name:'Tim II-C', ketua:'Tri Hariyono', anggota:'I Made Sukmawijaya', kasus:0, maxKasus:TOTAL_KASUS/6, bebanKerja:0 },
+        { id:'tim-iia', name:'Tim II-A', ketua:'Wildan Kristianto', anggota:'Robiansyah', kasus: 0, maxKasus:(TOTAL_KASUS/6).toFixed(0), bebanKerja:0 },
+        { id:'tim-iib', name:'Tim II-B', ketua:'Heni Maryati', anggota:'Dimas Nugroho', kasus:0, maxKasus:(TOTAL_KASUS/6).toFixed(0), bebanKerja:0 },
+        { id:'tim-iic', name:'Tim II-C', ketua:'Tri Hariyono', anggota:'I Made Sukmawijaya', kasus:0, maxKasus:(TOTAL_KASUS/6).toFixed(0), bebanKerja:0 },
     ]
 };
 
@@ -93,18 +93,32 @@ function renderAntrianTabel(data) {
     tbody.innerHTML = data.map((a, index) => `
         <tr>
             <td class="mono" style="font-size:11px; overflow-x:auto; max-width: 3rem">${a.np2}</td>
+            
             <td class="name" style="font-size:11px; overflow-x:auto; max-width: 3rem">${a.nama}</td>
+            
             <td>${renderJenisBadge(a.jenis)}</td>
+            
             <td>${String(a.tipe).toLowerCase().includes('badan') ? '<span class="badge badge-purple">Badan</span>' : '<span class="badge badge-gray">OP</span>'}</td>
-            <td class="mono" style="font-size:10px">${a.potensi.toLocaleString ? a.potensi.toLocaleString('id-ID', {
+            
+            <td class="mono" style="font-size:10px">
+            ${a.potensi.toLocaleString ? a.potensi.toLocaleString('id-ID', {
                 style: 'currency',
                 currency: 'IDR',
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
-            }) : a.potensi}</td>
+            }) : a.potensi.toLocaleString('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            })}
+            </td>
+
             <td>${renderKodeBadge(a.kode)}</td>
+            
             <td>${a.skor}</td>
-            <td style="display: block;">
+            
+            <td>
                 <button class="btn btn-primary btn-sm" onclick="openAssign('${a.nama}','${a.np2}','${a.jenis}','${a.tipe}','${a.potensi.toLocaleString ? a.potensi.toLocaleString('id-ID', {
                     style: 'currency',
                     currency: 'IDR',
@@ -360,6 +374,152 @@ function lookupCSVField(row, keys) {
     return '';
 }
 
+function calculateJatuhTempo(sp2Date) {
+    if (!sp2Date) return '';
+    const parsedDate = parseIndonesianDate(sp2Date) || new Date(sp2Date);
+    if (!parsedDate || Number.isNaN(parsedDate.getTime())) return sp2Date;
+    const result = new Date(parsedDate);
+    result.setMonth(result.getMonth() + 6);
+    return result.toISOString().split('T')[0];
+}
+
+function normalizeTimValue(value) {
+    if (!value) return '';
+    const cleaned = String(value).trim();
+    if (/^tim\s*i[-\s]?a$/i.test(cleaned)) return 'Tim I-A';
+    if (/^tim\s*i[-\s]?b$/i.test(cleaned)) return 'Tim I-B';
+    if (/^tim\s*i[-\s]?c$/i.test(cleaned)) return 'Tim I-C';
+    if (/^tim\s*ii[-\s]?a$/i.test(cleaned)) return 'Tim II-A';
+    if (/^tim\s*ii[-\s]?b$/i.test(cleaned)) return 'Tim II-B';
+    if (/^tim\s*ii[-\s]?c$/i.test(cleaned)) return 'Tim II-C';
+    return cleaned;
+}
+
+function mapCsvRowToSp2BelumLhp(row) {
+    const npwp = lookupCSVField(row, ['NPWP']);
+    const nama = lookupCSVField(row, ['NAMA WP', 'NAMA']);
+    const sp2 = lookupCSVField(row, ['SP2']);
+    const tglSp2 = lookupCSVField(row, ['TANGGAL SP2']);
+    const jenis = lookupCSVField(row, ['JENIS PEMERIKSAAN', 'JENIS']) || '';
+    const kodeRaw = lookupCSVField(row, ['KODE PEMERIKSAAN', 'KD KLU', 'KODE']);
+    const kodeNumber = Number(String(kodeRaw).replace(/[^0-9]/g, ''));
+    let kode = kodeNumber == 1462 || kodeNumber == 1461 || kodeNumber == 1452 || kodeNumber == 1451? "Pemsus DSPP" : 
+                        (kodeNumber == 1162 || kodeNumber == 1172 || kodeNumber == 1171 ? "Rutin DSPP" : 
+                            (kodeNumber == 1122 || kodeNumber == 1121? "Rutin Non LB (Likuidasi)" :
+                                (kodeNumber == 1182 || kodeNumber == 1181 || kodeNumber == 2182? "Rutin LB" : "Lainnya")
+                            )
+                        );
+
+    const rawTim = lookupCSVField(row, ['TIM']);
+
+    let tim = normalizeTimValue(rawTim);
+
+    if (rawTim) {
+        tim = rawTim.includes("KADI WARTONO")?
+                        (rawTim.includes("EKO ADRIANTO")?
+                            "Tim I-A"
+                            :
+                            (rawTim.includes("PURWOKO ERIE DHARMAWAN")?"Tim I-B":"Tim I-C")
+                        )
+                    :
+                        (rawTim.includes("TRI HARIYONO")?
+                            "Tim II-A"
+                            :
+                            (rawTim.includes("WILDAN KRISTIANTO")? "Tim II-B":"Tim II-C")
+                        );
+    }
+
+    const kelompok = tim.includes("Tim II")? "Kelompok II" : "Kelompok I";
+
+    const lhpDate = lookupCSVField(row, ['tanggal lhp', 'lhp']);
+
+    const sphpDate = lookupCSVField(row, ['tanggal sphp', 'sphp']);
+
+    const proses = lookupCSVField(row, ['TANGGAL LHP']) !== "null"? "Sudah LHP" : (
+                    lookupCSVField(row, ['TANGGAL SPHP']) !== "null"? "Sudah SPHP" : (
+                        lookupCSVField(row, ['TANGGAL SP2']) ? "Sedang Diperiksa": "Belum Input"
+                    )
+                );
+    
+    const potensiRaw = lookupCSVField(row, ['POTENSI AWAL']);
+
+    const potensiValue = Number(String(potensiRaw).replace(/[^0-9.-]/g, ''));
+
+    const potensi = Number.isNaN(potensiValue) ? 0 : potensiValue;
+
+    const tipe = String(kodeRaw).at(-1) === '2' ? 'Badan' : 'OP';
+    
+    const skor = menghitungBebanKerja(row, false);
+    
+    if (proses !== "Sudah LHP") {
+        switch(tim) {
+            case 'Tim I-A':
+                timData.k1.at(0).kasus += 1;
+                timData.k1.at(0).bebanKerja += skor;
+                break;
+            case 'Tim I-B':
+                timData.k1.at(1).kasus += 1;
+                timData.k1.at(1).bebanKerja += skor;
+                break;
+            case 'Tim I-C':
+                timData.k1.at(2).kasus += 1;
+                timData.k1.at(2).bebanKerja += skor;
+                break;
+            case 'Tim II-A':
+                timData.k2.at(0).kasus += 1;
+                timData.k2.at(0).bebanKerja += skor;
+                break;
+            case 'Tim II-B':
+                timData.k2.at(1).kasus += 1;
+                timData.k2.at(1).bebanKerja += skor;
+                break;
+            case 'Tim II-C':
+                timData.k2.at(2).kasus += 1;
+                timData.k2.at(2).bebanKerja += skor;
+                break;
+            default:
+                break;
+        }
+    }
+
+    return {
+        sp2,
+        npwp,
+        nama,
+        jenis,
+        tipe,
+        tim,
+        kelompok,
+        potensi,
+        tglSp2,
+        kode,
+        proses,
+        jatuhTempo: calculateJatuhTempo(tglSp2),
+        skor
+    };
+}
+
+function updateTeamWorkloadFromSp2() {
+    const teams = Object.values(timData).flat();
+    TOTAL_KASUS = sp2BelumLhp.length;
+    teams.forEach(team => {
+        team.kasus = 0;
+        team.bebanKerja = 0;
+        team.maxKasus = TOTAL_KASUS ? TOTAL_KASUS / 6 : 0;
+    });
+
+    sp2BelumLhp.forEach(item => {
+        if (item.proses !== 'Sudah LHP') {
+            const target = teams.find(team => team.name === item.tim);
+            if (target) {
+                target.kasus += 1;
+                target.bebanKerja += Number(item.skor) || 0;
+            }
+        }
+    });
+}
+
+// NP2 Belum SP2 functions
 function handleFileUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -371,6 +531,7 @@ function handleFileUpload(event) {
     }
 
     const reader = new FileReader();
+    
     reader.onload = function(e) {
         const text = String(e.target.result || '');
         const rows = parseCSV(text);
@@ -414,6 +575,7 @@ function handleFileUpload(event) {
             const skor = Number.isNaN(potensiNumber) ? 0 : Math.min(99, Math.max(0, Math.round(potensiNumber / 10000000)));
 
             imported.push({ np2, npwp, nama, jenis, kode, tipe, potensi, skor, baseSkor: skor, tanggalNp2, tanggalUsulan, noUsulan, masa, up2, kanwil, isProminent: false });
+            TOTAL_KASUS += 1;
             existingNp2.add(np2);
         });
 
@@ -426,7 +588,60 @@ function handleFileUpload(event) {
         np2BelumSp2Data = imported.concat(np2BelumSp2Data);
         filterAntrian();
         renderDashboard();
+        renderDistribusiBeban();
         showToast(`✓ ${imported.length} baris CSV berhasil ditambahkan`, 'green');
+        event.target.value = '';
+    };
+
+    reader.onerror = function() {
+        showToast('✕ Gagal membaca file CSV', 'red');
+        event.target.value = '';
+    };
+
+    reader.readAsText(file, 'UTF-8');
+}
+
+function handleKasusCsvUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+        showToast('✕ Format file harus .csv', 'amber');
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = String(e.target.result || '');
+        const rows = parseCSV(text);
+        if (!rows.length) {
+            showToast('✕ File CSV kosong atau tidak valid', 'amber');
+            event.target.value = '';
+            return;
+        }
+
+        const imported = rows.map(mapCsvRowToSp2BelumLhp).filter(item => item.sp2 && item.npwp && item.nama);
+        if (!imported.length) {
+            showToast('⚠ Tidak ada baris valid untuk ditambahkan', 'amber');
+            event.target.value = '';
+            return;                                              
+        }
+
+        sp2BelumLhp = imported;
+
+        updateTeamWorkloadFromSp2();
+        renderKasusTabel(sp2BelumLhp);
+        renderDashboard();
+        renderBebanKerja();
+        renderBebanKerjaSummary();
+
+        const deadlineData = prepareDeadlineData();
+        renderDeadline(deadlineData.k1, 'deadline-k1');
+        renderDeadline(deadlineData.k2, 'deadline-k2');
+        updateDeadlineStats(deadlineData.k1.concat(deadlineData.k2));
+
+        showToast(`✓ ${imported.length} baris CSV berhasil diimpor ke Kasus Aktif`, 'green');
         event.target.value = '';
     };
     reader.onerror = function() {
@@ -465,7 +680,7 @@ function renderTimCards(kelompok, containerId) {
             <div style="background:var(--bg4); border:1px solid var(--border); border-radius:var(--radius); padding:10px; margin-bottom:8px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                     <span style="font-size:12px; font-weight:600;">${t.name}</span>
-                    <span class="badge" style="background:${barColor}20; color:${barColor}">${t.kasus}/${t.maxKasus} Kasus</span>
+                    <span class="badge" style="background:${barColor}20; color:${barColor}">${t.kasus}/${t.maxKasus.toFixed(0)} Kasus</span>
                 </div>
 
                 <div class="progress-bar" style="margin-bottom:6px;"><div class="progress-fill" style="width:${pct}%; background:${barColor}"></div></div>
@@ -1008,39 +1223,47 @@ async function getNP2BelumSP2(cookieValue) {
 }
 
 function menghitungBebanKerja(item, isNp2) {
+    console.log(item);
+
+    let kode_pemeriksaan = Number(item["kode pemeriksaan"]);
+    
     let bebanKerja = 0;
-
+    
     if(isNp2) {
-        if (item[7] == 1182) bebanKerja = 100;
+        if (!kode_pemeriksaan) kode_pemeriksaan = item[7];
 
-        if (item[7] == 1462 || item[7] == 1452) bebanKerja = 85;
+        if (kode_pemeriksaan == 1182) bebanKerja = 100;
 
-        if (item[7] == 2182) bebanKerja = 75;
+        if (kode_pemeriksaan == 1462 || kode_pemeriksaan == 1452) bebanKerja = 85;
 
-        if (item[7] == 1461 || item[7] == 1451) bebanKerja = 60;
+        if (kode_pemeriksaan == 2182) bebanKerja = 75;
 
-        if (item[7] == 1181) bebanKerja = 50;
+        if (kode_pemeriksaan == 1461 || kode_pemeriksaan == 1451) bebanKerja = 60;
 
-        if (item[7] == 1162 || item[7] == 1172 || item[7] == 1171) bebanKerja = 40;
+        if (kode_pemeriksaan == 1181) bebanKerja = 50;
 
-        if (item[7] == 1122 || item[7] == 1121) bebanKerja = 20;
+        if (kode_pemeriksaan == 1162 || kode_pemeriksaan == 1172 || kode_pemeriksaan == 1171) bebanKerja = 40;
+
+        if (kode_pemeriksaan == 1122 || kode_pemeriksaan == 1121) bebanKerja = 20;
                 
         if (item[10] > 500000000) bebanKerja += 25;
 
     } else {
-        if (item[8] == 1182) bebanKerja = 100;
+        if (!kode_pemeriksaan) kode_pemeriksaan = item[8];
 
-        if (item[8] == 1462 || item[8] == 1452) bebanKerja = 85;
+        if (kode_pemeriksaan == 1182) bebanKerja = 100;
 
-        if (item[8] == 2182) bebanKerja = 75;
+        if (kode_pemeriksaan == 1462 || kode_pemeriksaan == 1452) bebanKerja = 85;
 
-        if (item[8] == 1461 || item[8] == 1451) bebanKerja = 60;
+        if (kode_pemeriksaan == 2182) bebanKerja = 75;
 
-        if (item[8] == 1181) bebanKerja = 50;
+        if (kode_pemeriksaan == 1461 || kode_pemeriksaan == 1451) bebanKerja = 60;
 
-        if (item[8] == 1162 || item[8] == 1172 || item[8] == 1171) bebanKerja = 40;
+        if (kode_pemeriksaan == 1181) bebanKerja = 50;
 
-        if (item[8] == 1122 || item[8] == 1121) bebanKerja = 20;
+        if (kode_pemeriksaan == 1162 || kode_pemeriksaan == 1172 || kode_pemeriksaan == 1171) bebanKerja = 40;
+
+        if (kode_pemeriksaan == 1122 || kode_pemeriksaan == 1121) bebanKerja = 20;
                 
         if (item[23] > 500000000) bebanKerja += 25;
     }

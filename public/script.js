@@ -119,19 +119,9 @@ function renderAntrianTabel(data) {
             <td>${a.skor}</td>
             
             <td>
-                <button class="btn btn-primary btn-sm" title="Assign" onclick="openAssign('
-                ${a.nama}','
-                ${a.np2}','
-                ${a.jenis}','
-                ${a.tipe}','
-                ${a.potensi.toLocaleString ? a.potensi.toLocaleString('id-ID', {
-                    style: 'currency',
-                    currency: 'IDR',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                }) : a.potensi}','
-                ${a.kode}',
-                '${a.skor}')">Assign</button>
+                <button class="btn btn-primary btn-sm" title="Assign" onclick="
+                openAssign(
+                '${a.nama}','${a.np2}','${a.jenis}','${a.tipe}','${a.potensi.toLocaleString('id-ID', {style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0,})}','${a.kode}','${a.skor}')">Assign</button>
                 
                 <button class="btn ${a.isProminent ? 'btn-success' : 'btn-danger'} btn-sm" style="margin-left:0.5rem;" title="Prominent People" onClick="setIsProminent(${index})">${a.isProminent ? 'Prominent ✓' : '⚑'}</button>
             </td>
@@ -298,28 +288,70 @@ function filterTahunPajak() {
     renderDashboard();
 }
 
+function getKodeCategory(kode) {
+    const text = String(kode || '').toLowerCase();
+    if (text.includes('pemsus')) return 'Pemsus DSPP';
+    if (text.includes('rutin dspp') || text.includes('rutindsp')) return 'Rutin DSPP';
+    if (text.includes('rutin non lb')) return 'Rutin Non LB (Likuidasi)';
+    if (text.includes('rutin lb')) return 'Rutin LB';
+    return 'Lainnya';
+}
+
 function renderDistribusiBeban() {
+    const categories = ['Pemsus DSPP', 'Rutin DSPP', 'Rutin Non LB (Likuidasi)', 'Rutin LB', 'Lainnya'];
+    const colors = {
+        'Pemsus DSPP': '#8b5cf6',
+        'Rutin DSPP': '#2563eb',
+        'Rutin Non LB (Likuidasi)': '#14b8a6',
+        'Rutin LB': '#f59e0b',
+        'Lainnya': '#6b7280'
+    };
+
     ['k1', 'k2'].forEach((kelompok, idx) => {
         const bars = document.getElementById(`dashboard-bars-${kelompok}`);
         const badge = document.getElementById(`dashboard-total-${kelompok}`);
         if (!bars || !badge) return;
 
-        const tims = timData[kelompok] || [];
-        const totalKasus = tims.reduce((sum, tim) => sum + tim.kasus, 0);
+        const allTeamCases = sp2BelumLhp.filter(item => item.kelompok === (kelompok === 'k1' ? 'Kelompok I' : 'Kelompok II'));
+        const totalKasus = allTeamCases.length;
         badge.textContent = `${totalKasus} Kasus`;
         badge.className = `badge ${kelompok === 'k1' ? 'badge-amber' : 'badge-green'}`;
 
-        bars.innerHTML = tims.map(t => {
-            const pct = Math.round((t.kasus / t.maxKasus) * 100);
-            const barColor = pct >= 80 ? 'var(--red)' : pct >= 60 ? 'var(--amber)' : 'var(--green)';
+        const legendHtml = `
+            <div class="bar-legend">
+                ${categories.map(cat => `
+                    <div class="bar-legend-item">
+                        <span class="bar-legend-color" style="background:${colors[cat]}"></span>
+                        <span>${cat}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        bars.innerHTML = legendHtml + timData[kelompok].map(t => {
+            const teamCases = allTeamCases.filter(item => item.tim === t.name);
+            const counts = categories.reduce((acc, cat) => {
+                acc[cat] = teamCases.filter(item => getKodeCategory(item.kode) === cat).length;
+                return acc;
+            }, {});
+            const total = Object.values(counts).reduce((sum, current) => sum + current, 0);
+            const segments = categories.map(cat => {
+                const count = counts[cat];
+                if (!count) return '';
+                return `
+                    <div class="bar-segment" style="flex:${count}; background:${colors[cat]}" title="${cat}: ${count} kasus">
+                        ${total > 0 && Math.round((count / total) * 100) >= 10 ? `<span class="bar-segment-label">${count}</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+
             return `
                 <div class="bar-row">
                     <div class="bar-label">${t.name}</div>
                     <div class="bar-track">
-                        <div class="bar-fill" style="width:${pct}%; background:${barColor}">
-                            <span class="bar-val">${t.kasus}/${t.maxKasus}</span>
-                        </div>
+                        ${segments || '<div class="bar-empty">Tidak ada kasus</div>'}
                     </div>
+                    <div class="bar-total">${total} kasus</div>
                 </div>
             `;
         }).join('');
@@ -328,6 +360,7 @@ function renderDistribusiBeban() {
 
 function renderDeadlineNearbyTable(data) {
     const tbody = document.getElementById('tabel-jatuh-tempo-terdekat');
+
     if (!tbody) return;
 
     const deadlineRows = (data || [])
@@ -344,7 +377,8 @@ function renderDeadlineNearbyTable(data) {
         return `
             <tr>
                 <td class="mono">${item.sp2 || '—'}</td>
-                <td class="mono">${item.np2 || item.npwp || '—'}</td>
+                <td class="mono">${item.np2 || '—'}</td>
+                <td class="mono">${item.npwp || '—'}</td>
                 <td>${item.nama || '—'}</td>
                 <td>${item.tim || '—'}</td>
                 <td class="mono">${item.jatuhTempo || '—'}</td>
@@ -436,6 +470,7 @@ function mapCsvRowToSp2BelumLhp(row) {
     const npwp = lookupCSVField(row, ['NPWP']);
     const nama = lookupCSVField(row, ['NAMA WP', 'NAMA']);
     const sp2 = lookupCSVField(row, ['SP2']);
+    const np2 = lookupCSVField(row, ["NP2"]);
     const tglSp2 = lookupCSVField(row, ['TANGGAL SP2']);
     const jenis = lookupCSVField(row, ['JENIS PEMERIKSAAN', 'JENIS']) || '';
     const kodeRaw = lookupCSVField(row, ['KODE PEMERIKSAAN', 'KD KLU', 'KODE']);
@@ -521,6 +556,7 @@ function mapCsvRowToSp2BelumLhp(row) {
 
     return {
         sp2,
+        np2,
         npwp,
         nama,
         jenis,
@@ -707,7 +743,7 @@ function renderAntreanDashboard(data) {
             <td>${String(a.tipe).toLowerCase().includes('badan') ? '<span class="badge badge-purple">Badan</span>' : '<span class="badge badge-gray">OP</span>'}</td>
             <td>${renderKodeBadge(a.kode)}</td>
             <td>${a.skor}</td>
-            <td><button class="btn btn-primary btn-sm" onclick="openAssign('${a.nama}','${a.np2}','${a.jenis}','${a.tipe}','${a.potensi}','${a.kode}')">Assign</button></td>
+            <td><button class="btn btn-primary btn-sm" onclick="openAssign('${a.nama}','${a.np2}','${a.jenis}','${a.tipe}','${a.potensi}','${a.kode}', '${a.skor}')">Assign</button></td>
         </tr>
     `).join('');
 }
@@ -804,8 +840,7 @@ function calculateSisaHari(jatuhTempoStr) {
         jatuhTempo.setHours(0, 0, 0, 0);
         
         const diffTime = jatuhTempo - now;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return Math.max(0, diffDays);
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     } catch (e) {
         return 0;
     }
@@ -824,7 +859,7 @@ function prepareDeadlineData() {
         jatuhTempo: item.jatuhTempo,
         kelompok: item.kelompok,
         sisaHari: calculateSisaHari(item.jatuhTempo)
-    })).filter(item => item.sisaHari > 0);
+    })).filter(item => Number.isFinite(item.sisaHari));
 
     return {
         k1: deadlineData.filter(item => item.kelompok === 'Kelompok I').sort((a, b) => a.sisaHari - b.sisaHari),
@@ -833,14 +868,17 @@ function prepareDeadlineData() {
 }
 
 function updateDeadlineStats(allDeadlines) {
-    const kurang14 = allDeadlines.filter(d => d.sisaHari < 14).length;
+    const melewati = allDeadlines.filter(d => d.sisaHari < 0).length;
+    const kurang14 = allDeadlines.filter(d => d.sisaHari >= 0 && d.sisaHari < 14).length;
     const dari14Ke30 = allDeadlines.filter(d => d.sisaHari >= 14 && d.sisaHari < 30).length;
     const lebih30 = allDeadlines.filter(d => d.sisaHari >= 30).length;
     
+    const elemMelewati = document.getElementById('dl-melewati-jatuh-tempo');
     const elem14 = document.getElementById('dl-kurang-14-hari');
     const elem1430 = document.getElementById('dl-14-30-hari');
     const elem30 = document.getElementById('dl-lebih-30-hari');
     
+    if (elemMelewati) elemMelewati.textContent = melewati;
     if (elem14) elem14.textContent = kurang14;
     if (elem1430) elem1430.textContent = dari14Ke30;
     if (elem30) elem30.textContent = lebih30;
@@ -851,12 +889,15 @@ function renderDeadline(data, containerId) {
     container.innerHTML = data.sort((a,b) => a.sisaHari - b.sisaHari).map(d => {
         const color = d.sisaHari < 14 ? 'var(--red)' : d.sisaHari < 30 ? 'var(--amber)' : 'var(--green)';
         const bg = d.sisaHari < 14 ? 'var(--red-dim)' : d.sisaHari < 30 ? 'var(--amber-dim)' : 'var(--green-dim)';
+        const displayValue = Math.abs(d.sisaHari);
+        const displayText = d.sisaHari < 0 ? `Lewat ${displayValue}` : `${displayValue}`;
+        const unitLabel = d.sisaHari < 0 ? 'hari lewat' : 'hari';
         return `
         <div class="deadline-item">
             <div class="deadline-days" style="background:${bg}; color:${color}">
-                <span class="num">${d.sisaHari}</span>
+                <span class="num">${displayText}</span>
                 
-                <span class="unit">hari</span>
+                <span class="unit">${unitLabel}</span>
             </div>
 
             <div class="deadline-info">
@@ -1009,18 +1050,19 @@ function updateTimOptions() {
 
     const tims = timData[k];
 
-    tims.sort((a,b) => a.kasus - b.kasus).forEach(t => {
+    const sortedTims = [...tims].sort((a,b) => a.kasus - b.kasus);
+    sortedTims.forEach(t => {
         sel.innerHTML += `<option value="${t.id}">${t.name} — ${t.kasus} kasus aktif</option>`;
     });
     
-    const rec = tims.reduce((a,b) => a.kasus < b.kasus ? a : b);
+    const rec = sortedTims.reduce((a,b) => a.kasus < b.kasus ? a : b);
 
     document.getElementById('rekomendasi-tim').textContent = `${rec.name} (beban terendah: ${rec.kasus} kasus)`;
 }
 
 function confirmAssign() {
     const kelompok = document.getElementById('sel-kelompok').value;
-    const timId = document.getElementById('sel-tim').value;
+    let timId = document.getElementById('sel-tim').value;
     const timText = document.getElementById('sel-tim').options[document.getElementById('sel-tim').selectedIndex]?.text?.split(' — ')[0] || '';
     if(!kelompok || !timId) { showToast('⚠ Pilih kelompok dan tim terlebih dahulu', 'amber'); return; }
 
@@ -1044,19 +1086,20 @@ function confirmAssign() {
 
     const sp2obj = {
         sp2: '',
+        np2: item.np2 || '',
         npwp: item.npwp || '',
         nama: item.nama || '',
         jenis: item.jenis || '',
         tipe: item.tipe || '',
         tim: kelompok == "k1"? (
-            timId == "tim i-a"? "Tim I-A" : (
-                timId == "tim i-b"? "Tim I-B" : "Tim I-C"
+            timId == "tim-ia"? "Tim I-A" : (
+                timId == "tim-ib"? "Tim I-B" : "Tim I-C"
             ) 
         )
         : 
         (
-            timId == "tim ii-a" ? "Tim II-A" : (
-                timId == "tim ii-b"? "Tim II-B" : "Tim II-C"
+            timId == "tim-iia" ? "Tim II-A" : (
+                timId == "tim-iib"? "Tim II-B" : "Tim II-C"
             )
         ),
         kelompok: kelompok == 'k1'? "Kelompok 1" : "Kelompok 2",
@@ -1069,24 +1112,36 @@ function confirmAssign() {
     };
     
     switch(timId) {
-        case "tim i-a":
-            timData.k1.at(0).bebanKerja += item.bebanKerja;
+        case "tim-ia": {
+            const team = timData.k1.find(t => t.id === 'tim-ia');
+            if (team) team.bebanKerja += item.skor;
             break;
-        case "tim i-b":
-            timData.k1.at(1).bebanKerja += item.bebanKerja;
+        }
+        case "tim-ib": {
+            const team = timData.k1.find(t => t.id === 'tim-ib');
+            if (team) team.bebanKerja += item.skor;
             break;
-        case "tim i-c":
-            timData.k1.at(2).bebanKerja += item.bebanKerja;
+        }
+        case "tim-ic": {
+            const team = timData.k1.find(t => t.id === 'tim-ic');
+            if (team) team.bebanKerja += item.skor;
             break;
-        case "tim ii-a":
-            timData.k2.at(0).bebanKerja += item.bebanKerja;
+        }
+        case "tim-iia": {
+            const team = timData.k2.find(t => t.id === 'tim-iia');
+            if (team) team.bebanKerja += item.skor;
             break;
-        case "tim ii-b":
-            timData.k2.at(1).bebanKerja += item.bebanKerja;
+        }
+        case "tim-iib": {
+            const team = timData.k2.find(t => t.id === 'tim-iib');
+            if (team) team.bebanKerja += item.skor;
             break;
-        case "tim ii-c":
-            timData.k2.at(2).bebanKerja += item.bebanKerja;
-            break;  
+        }
+        case "tim-iic": {
+            const team = timData.k2.find(t => t.id === 'tim-iic');
+            if (team) team.bebanKerja += item.skor;
+            break;
+        }
         default:
             break;
     }
@@ -1166,6 +1221,7 @@ function autoAssignAll() {
         // create SP2-like object from NP2 item
         const sp2obj = {
             sp2: '',
+            np2: item.np2 || '',
             npwp: item.npwp || '',
             nama: item.nama || '',
             jenis: item.jenis || '',
@@ -1273,8 +1329,6 @@ async function getNP2BelumSP2(cookieValue) {
 }
 
 function menghitungBebanKerja(item, isNp2) {
-    console.log(item);
-
     let kode_pemeriksaan = Number(item["kode pemeriksaan"]);
     
     let bebanKerja = 0;
@@ -1284,13 +1338,13 @@ function menghitungBebanKerja(item, isNp2) {
 
         if (kode_pemeriksaan == 1182) bebanKerja = 100;
 
-        if (kode_pemeriksaan == 1462 || kode_pemeriksaan == 1452) bebanKerja = 85;
+        if (kode_pemeriksaan == 2182) bebanKerja = 85;
 
-        if (kode_pemeriksaan == 2182) bebanKerja = 75;
+        if (kode_pemeriksaan == 1181) bebanKerja = 75;
 
-        if (kode_pemeriksaan == 1461 || kode_pemeriksaan == 1451) bebanKerja = 60;
+        if (kode_pemeriksaan == 1462 || kode_pemeriksaan == 1452) bebanKerja = 60;
 
-        if (kode_pemeriksaan == 1181) bebanKerja = 50;
+        if (kode_pemeriksaan == 1461 || kode_pemeriksaan == 1451) bebanKerja = 50;
 
         if (kode_pemeriksaan == 1162 || kode_pemeriksaan == 1172 || kode_pemeriksaan == 1171) bebanKerja = 40;
 
@@ -1303,13 +1357,13 @@ function menghitungBebanKerja(item, isNp2) {
 
         if (kode_pemeriksaan == 1182) bebanKerja = 100;
 
-        if (kode_pemeriksaan == 1462 || kode_pemeriksaan == 1452) bebanKerja = 85;
+        if (kode_pemeriksaan == 2182) bebanKerja = 85;
 
-        if (kode_pemeriksaan == 2182) bebanKerja = 75;
+        if (kode_pemeriksaan == 1181) bebanKerja = 75;
 
-        if (kode_pemeriksaan == 1461 || kode_pemeriksaan == 1451) bebanKerja = 60;
+        if (kode_pemeriksaan == 1462 || kode_pemeriksaan == 1452) bebanKerja = 60;
 
-        if (kode_pemeriksaan == 1181) bebanKerja = 50;
+        if (kode_pemeriksaan == 1461 || kode_pemeriksaan == 1451) bebanKerja = 50;
 
         if (kode_pemeriksaan == 1162 || kode_pemeriksaan == 1172 || kode_pemeriksaan == 1171) bebanKerja = 40;
 
@@ -1342,7 +1396,9 @@ async function getSP2BelumLHP(cookieValue) {
             const array = responseJson["object"];
 
             sp2BelumLhp = array.map((item) => ({
-                sp2: item[5],
+                sp2: item[10],
+
+                np2: item[5],
 
                 npwp: item[0],
 

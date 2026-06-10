@@ -146,7 +146,7 @@ const server = https.createServer(options, (req, res) => {
                 myHeaders.Cookie = cookieValue;
             }
 
-            const apiUrl = "https://portalp2.intranet.pajak.go.id/ekin/getDetail?tahun=2026&bulan=1&bulanAkhir=5&unit=072&level=3&url=sp2belumlhp&jenis=1";
+            const apiUrl = "https://portalp2.intranet.pajak.go.id/ekin/getDetail?tahun=2026&bulan=1&bulanAkhir=12&unit=072&level=3&url=sp2belumlhp&jenis=1";
             
             const parsedUrl = new url.URL(apiUrl);
             

@@ -177,7 +177,7 @@
             <div class="tbl-wrap">
               <table class="tbl">
                 <thead><tr>
-                  <th>SP2</th><th>NP2</th><th>Nama WP</th><th>Tim</th><th>Jatuh Tempo</th><th>Sisa</th><th>Status</th>
+                  <th>SP2</th><th>NP2</th><th>NPWP</th><th>Nama WP</th><th>Tim</th><th>Jatuh Tempo</th><th>Sisa</th><th>Status</th>
                 </tr></thead>
                 
                 <tbody id="tabel-jatuh-tempo-terdekat">
@@ -341,10 +341,11 @@
               <div class="section-sub">Urut berdasarkan jatuh tempo terdekat</div>
             </div>
             
-            <div style="display:flex; gap:8px;">
-              <span class="badge badge-red">● &lt;14 hari:<p id="dl-kurang-14-hari" ></p>kasus</span>
-              <span class="badge badge-amber">● 14-30 hari: <p id="dl-14-30-hari"></p>>kasus</span>
-              <span class="badge badge-green">● &gt;30 hari: <p id="dl-lebih-30-hari"></p>kasus</span>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <span class="badge badge-red">● Melewati Jatuh Tempo: <p id="dl-melewati-jatuh-tempo"></p> kasus</span>
+              <span class="badge badge-red">● &lt;14 hari: <p id="dl-kurang-14-hari"></p> kasus</span>
+              <span class="badge badge-amber">● 14-30 hari: <p id="dl-14-30-hari"></p> kasus</span>
+              <span class="badge badge-green">● &gt;30 hari: <p id="dl-lebih-30-hari"></p> kasus</span>
             </div>
           </div>
 

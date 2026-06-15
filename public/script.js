@@ -1,6 +1,15 @@
 var IS_CONNECTED = false;
 var TOTAL_KASUS = 0;
 
+// ========== USER MANAGEMENT ==========
+const userProfiles = {
+    admin: { id: 'admin', name: 'Admin P3', role: 'admin', avatar: 'AD', description: 'Administrator' },
+    spv1: { id: 'spv1', name: 'SPV Kelompok I', role: 'spv', kelompok: 'k1', avatar: 'S1', description: 'Supervisor Kelompok I' },
+    spv2: { id: 'spv2', name: 'SPV Kelompok II', role: 'spv', kelompok: 'k2', avatar: 'S2', description: 'Supervisor Kelompok II' }
+};
+
+let currentUser = userProfiles.admin;
+
 // ========== DATA ==========
 let = timData = {
     k1: [
@@ -28,18 +37,73 @@ const PROMINENT_BONUS = 100;
 
 const logData = [];
 
-const deadlineK1 = [
-    // { sp2:'SP2-2024-0301', nama:'PT Karya Mandiri', tim:'Tim I-A', jatuhTempo:'12 Jun 2025', sisaHari:8, jenis:'Khusus' },
-    // { sp2:'SP2-2024-0275', nama:'PT Sumber Makmur', tim:'Tim I-C', jatuhTempo:'24 Jun 2025', sisaHari:20, jenis:'Khusus' },
-    // { sp2:'SP2-2024-0295', nama:'CV Mitra Sejati', tim:'Tim I-A', jatuhTempo:'19 Jun 2025', sisaHari:15, jenis:'Khusus' },
-    // { sp2:'SP2-2024-0280', nama:'Hendra Kusuma', tim:'Tim I-B', jatuhTempo:'05 Jul 2025', sisaHari:58, jenis:'Rutin' },
-];
+const deadlineK1 = [];
 
-const deadlineK2 = [
-    // { sp2:'SP2-2024-0288', nama:'CV Usaha Tani', tim:'Tim II-B', jatuhTempo:'18 Jun 2025', sisaHari:14, jenis:'Rutin' },
-    // { sp2:'SP2-2024-0260', nama:'PT Nusantara Jaya', tim:'Tim II-C', jatuhTempo:'15 Jul 2025', sisaHari:68, jenis:'Khusus' },
-    // { sp2:'SP2-2024-0268', nama:'Siti Aminah', tim:'Tim II-A', jatuhTempo:'10 Jul 2025', sisaHari:63, jenis:'Rutin' },
-];
+const deadlineK2 = [];
+
+// ========== USER MANAGEMENT FUNCTIONS ==========
+function toggleUserDropdown() {
+    const dropdown = document.getElementById('user-dropdown');
+    if (dropdown) {
+        if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+            dropdown.style.display = 'flex';
+        } else {
+            dropdown.style.display = 'none';
+        }
+    }
+}
+
+function switchUser(userId) {
+    if (!userProfiles[userId]) return;
+    
+    currentUser = userProfiles[userId];
+    
+    // Update UI
+    document.getElementById('user-avatar').textContent = currentUser.avatar;
+    document.getElementById('user-name').textContent = currentUser.name;
+    document.getElementById('user-role').textContent = currentUser.description;
+    
+    // Close dropdown
+    const dropdown = document.getElementById('user-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    
+    // Log activity
+    logData.unshift({
+        aksi: 'Login',
+        icon: '🔐',
+        color: 'var(--blue)',
+        entitas: currentUser.name,
+        detail: `User berganti ke ${currentUser.name}`,
+        waktu: new Date().toISOString().replace('T',' ').slice(0,19)
+    });
+    
+    // Refresh dashboard
+    renderDashboard();
+    renderLog();
+    
+    showToast(`✓ Berhasil login sebagai ${currentUser.name}`, 'green');
+}
+
+function canAccessAssignment() {
+    // Admin dapat assign NP2 ke Kelompok
+    // SPV hanya dapat assign ke Tim dalam kelompoknya
+    return true;
+}
+
+function getAssignmentTargetType() {
+    // Admin assign ke Kelompok, SPV assign ke Tim
+    return currentUser.role === 'admin' ? 'kelompok' : 'tim';
+}
+
+function filterAssignmentOptions(targetType) {
+    // Filter options berdasarkan user role
+    if (currentUser.role === 'admin') {
+        return ['Kelompok I', 'Kelompok II'];
+    } else if (currentUser.role === 'spv') {
+        return currentUser.kelompok === 'k1' ? 'k1' : 'k2';
+    }
+    return null;
+}
 
 // ========== RENDER FUNCTIONS ==========
 function renderKasusTabel(data) {
@@ -87,10 +151,28 @@ function renderKodeBadge(kode) {
     return `<span class="badge badge-kode">${kode}</span>`;
 }
 
+function getAntrianDataByRole() {
+    if (currentUser.role === 'admin') {
+        // Admin sees NP2 that haven't been assigned to any kelompok
+        return np2BelumSp2Data.filter(item => !item.kelompokId);
+    } else if (currentUser.role === 'spv') {
+        // SPV sees NP2 assigned to their kelompok
+        return np2BelumSp2Data.filter(item => item.kelompokId === currentUser.kelompok);
+    }
+    return np2BelumSp2Data;
+}
+
 function renderAntrianTabel(data) {
     const tbody = document.getElementById('antrian-tbody');
+    
+    // Filter data based on user role
+    const filteredData = currentUser.role === 'admin' 
+        ? data.filter(item => !item.kelompokId)
+        : currentUser.role === 'spv'
+        ? data.filter(item => item.kelompokId === currentUser.kelompok)
+        : data;
 
-    tbody.innerHTML = data.map((a, index) => `
+    tbody.innerHTML = filteredData.map((a, index) => `
         <tr>
             <td class="mono" style="font-size:11px; overflow-x:auto; max-width: 3rem">${a.np2}</td>
             
@@ -253,7 +335,15 @@ function filterByYear(data, field) {
 }
 
 function renderDashboard() {
-    const filteredAntrian = filterByYear(np2BelumSp2Data, 'np2');
+    // Filter data based on user role
+    let antrianData = np2BelumSp2Data;
+    if (currentUser.role === 'admin') {
+        antrianData = np2BelumSp2Data.filter(item => !item.kelompokId);
+    } else if (currentUser.role === 'spv') {
+        antrianData = np2BelumSp2Data.filter(item => item.kelompokId === currentUser.kelompok);
+    }
+    
+    const filteredAntrian = filterByYear(antrianData, 'np2');
     const filteredKasus = filterByYear(sp2BelumLhp, 'tglSp2');
 
     document.getElementById('card-total-np2-antre').textContent = filteredAntrian.length;
@@ -334,6 +424,7 @@ function renderDistribusiBeban() {
                 acc[cat] = teamCases.filter(item => getKodeCategory(item.kode) === cat).length;
                 return acc;
             }, {});
+
             const total = Object.values(counts).reduce((sum, current) => sum + current, 0);
             const segments = categories.map(cat => {
                 const count = counts[cat];
@@ -716,6 +807,8 @@ function handleKasusCsvUpload(event) {
         renderDashboard();
         renderBebanKerja();
         renderBebanKerjaSummary();
+        renderDistribusiBeban();
+
 
         const deadlineData = prepareDeadlineData();
         renderDeadline(deadlineData.k1, 'deadline-k1');
@@ -748,25 +841,30 @@ function renderAntreanDashboard(data) {
     `).join('');
 }
 
-function renderTimCards(kelompok, containerId) {
+function renderTimCards(kelompok, containerId, totalId) {
     const tims = timData[kelompok];
-
     const container = document.getElementById(containerId);
+    const totalBadge = totalId ? document.getElementById(totalId) : null;
+
+    if (!container) return;
+
+    const totalCases = tims.reduce((sum, t) => sum + Number(t.kasus || 0), 0);
+    if (totalBadge) totalBadge.textContent = `${totalCases} Kasus`;
 
     container.innerHTML = tims.map(t => {
-        const pct = Math.round((t.kasus / t.maxKasus) * 100);
-
+        const maxKasus = Number(t.maxKasus) || 0;
+        const pct = maxKasus ? Math.round((t.kasus / maxKasus) * 100) : 0;
         const barColor = pct >= 80 ? 'var(--red)' : pct >= 60 ? 'var(--amber)' : 'var(--green)';
 
-        return `
-            <div style="background:var(--bg4); border:1px solid var(--border); border-radius:var(--radius); padding:10px; margin-bottom:8px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                    <span style="font-size:12px; font-weight:600;">${t.name}</span>
-                    <span class="badge" style="background:${barColor}20; color:${barColor}">${t.kasus}/${t.maxKasus} Kasus</span>
-                </div>
+        const fillHtml = t.kasus > 0
+            ? `<div class="bar-segment" style="width:${Math.min(pct, 100)}%; background:${barColor}">${t.kasus}</div>`
+            : `<div class="bar-empty">0 kasus</div>`;
 
-                <div class="progress-bar" style="margin-bottom:6px;"><div class="progress-fill" style="width:${pct}%; background:${barColor}"></div></div>
-                <div style="font-size:10px; color:var(--text3)">Ketua: ${t.ketua} · Anggota: ${t.anggota}</div>
+        return `
+            <div class="bar-row" style="align-items:center; margin-bottom:8px;">
+                <div class="bar-label">${t.name}</div>
+                <div class="bar-track">${fillHtml}</div>
+                <div class="bar-total">${t.kasus}/${t.maxKasus} kasus</div>
             </div>
         `;
     }).join('');
@@ -775,15 +873,22 @@ function renderTimCards(kelompok, containerId) {
 function renderBebanKerja() {
     ['k1','k2'].forEach((k, ki) => {
         const tims = timData[k];
-        
         const container = document.getElementById(`beban-kelompok${ki+1}`);
-        
+        if (!container) return;
+
         container.innerHTML = tims.map(t => {
-        
-            const pct = Math.round((t.kasus / t.maxKasus) * 100);
-        
+            const maxKasus = Number(t.maxKasus) || 0;
+            const pct = maxKasus ? Math.round((t.kasus / maxKasus) * 100) : 0;
             const barColor = pct >= 80 ? 'var(--red)' : pct >= 60 ? 'var(--amber)' : 'var(--green)';
-        
+
+            const aktifBar = t.kasus > 0
+                ? `<div class="bar-segment" style="width:${Math.min(pct, 100)}%; background:${barColor}">${t.kasus}</div>`
+                : `<div class="bar-empty">0 kasus</div>`;
+
+            const bebanBar = t.bebanKerja > 0
+                ? `<div class="bar-segment" style="width:${Math.min(pct, 100)}%; background:${barColor}">${t.bebanKerja}</div>`
+                : `<div class="bar-empty">0</div>`;
+
             return `
                 <div class="team-card" style="margin-bottom:12px;">
                     <div class="team-header">
@@ -797,16 +902,16 @@ function renderBebanKerja() {
                         <div class="member-chip"><span class="member-role">Anggota</span><span class="member-name">${t.anggota}</span></div>
                     </div>
 
-                    <div class="workload-row">
-                        <span class="workload-label">Kasus Aktif</span>
-                        <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:${pct}%;background:${barColor}"></div></div>
-                        <span class="workload-count">${t.kasus}</span>
+                    <div class="bar-row" style="margin-bottom:8px;">
+                        <div class="bar-label">Kasus Aktif</div>
+                        <div class="bar-track">${aktifBar}</div>
+                        <div class="bar-total">${t.kasus}</div>
                     </div>
 
-                    <div class="workload-row">
-                        <span class="workload-label">Beban Kerja</span>
-                        <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:${pct}%;background:${barColor}"></div></div>
-                        <span class="workload-count">${t.bebanKerja}</span>
+                    <div class="bar-row" style="margin-bottom:8px;">
+                        <div class="bar-label">Beban Kerja</div>
+                        <div class="bar-track">${bebanBar}</div>
+                        <div class="bar-total">${t.bebanKerja}</div>
                     </div>
 
                     <div style="font-size:11px;color:var(--text3);margin-top:6px;">Jangka waktu tiap kasus: 6 bulan</div>
@@ -955,10 +1060,11 @@ function showPage(id) {
         renderDashboard();
     } else if(id === 'assign') {
         renderAntrianTabel(np2BelumSp2Data);
-        renderTimCards('k1', 'tim-cards-k1');
-        renderTimCards('k2', 'tim-cards-k2');
+        renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
+        renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
         renderBebanKerja();
         renderBebanKerjaSummary();
+        renderDistribusiBeban();
     } else if(id === 'bebankerja') {
         renderBebanKerja();
         renderBebanKerjaSummary();
@@ -1009,6 +1115,14 @@ function filterAntrian() {
 function openAssign(nama, np2, jenis='KHUSUS', tipe='WP Badan', potensi='—', kode = '—', skor='—') {
     currentAssignNP2 = np2;
 
+    // Update modal title berdasarkan role
+    const titleEl = document.getElementById('modal-assign-title');
+    if (currentUser.role === 'admin') {
+        titleEl.textContent = 'Assign Kasus ke Kelompok';
+    } else {
+        titleEl.textContent = `Assign Kasus ke Tim (${currentUser.kelompok === 'k1' ? 'Kelompok I' : 'Kelompok II'})`;
+    }
+
     document.getElementById('modal-np2').textContent = np2;
 
     document.getElementById('modal-wp').textContent = nama;
@@ -1030,9 +1144,27 @@ function openAssign(nama, np2, jenis='KHUSUS', tipe='WP Badan', potensi='—', k
 
     document.getElementById('modal-kode').textContent = np2BelumSp2Data.find(item => item.np2 === np2)?.kode || '—';
 
-    document.getElementById('sel-kelompok').value = '';
+    // Handle based on role
+    const kelompokSelect = document.getElementById('sel-kelompok');
+    const timSelect = document.getElementById('sel-tim');
+    const kelompokFormGroup = kelompokSelect.closest('.form-group');
+    const timFormGroup = timSelect.closest('.form-group');
 
-    document.getElementById('sel-tim').innerHTML = '<option value="">— Pilih Tim —</option>';
+    if (currentUser.role === 'admin') {
+        // Admin: Show kelompok options, hide tim
+        kelompokFormGroup.style.display = 'block';
+        timFormGroup.style.display = 'none';
+        kelompokSelect.value = '';
+        timSelect.innerHTML = '<option value="">— Pilih Tim —</option>';
+        kelompokSelect.label = 'Kelompok';
+    } else {
+        // SPV: Hide kelompok, show tim for their group
+        kelompokFormGroup.style.display = 'none';
+        timFormGroup.style.display = 'block';
+        const k = currentUser.kelompok;
+        kelompokSelect.value = k;
+        updateTimOptions();
+    }
 
     document.getElementById('modal-assign').classList.add('show');
 }
@@ -1061,111 +1193,127 @@ function updateTimOptions() {
 }
 
 function confirmAssign() {
-    const kelompok = document.getElementById('sel-kelompok').value;
-    let timId = document.getElementById('sel-tim').value;
-    const timText = document.getElementById('sel-tim').options[document.getElementById('sel-tim').selectedIndex]?.text?.split(' — ')[0] || '';
-    if(!kelompok || !timId) { showToast('⚠ Pilih kelompok dan tim terlebih dahulu', 'amber'); return; }
-
-    const timObject = timData[kelompok]?.find(t => t.id === timId);
-
-    if(!timObject) {
-        showToast('✕ Tim tidak ditemukan', 'red');
-        return;
-    }
-
     const np2 = currentAssignNP2;
-
+    
     if(!np2) {
         showToast('✕ Data NP2 tidak valid', 'red');
         return;
     }
-
-    timObject.kasus += 1;
-
-    let item = np2BelumSp2Data.at(np2BelumSp2Data.findIndex(item => item.np2 === String(np2)));
-
-    const sp2obj = {
-        sp2: '',
-        np2: item.np2 || '',
-        npwp: item.npwp || '',
-        nama: item.nama || '',
-        jenis: item.jenis || '',
-        tipe: item.tipe || '',
-        tim: kelompok == "k1"? (
-            timId == "tim-ia"? "Tim I-A" : (
-                timId == "tim-ib"? "Tim I-B" : "Tim I-C"
-            ) 
-        )
-        : 
-        (
-            timId == "tim-iia" ? "Tim II-A" : (
-                timId == "tim-iib"? "Tim II-B" : "Tim II-C"
-            )
-        ),
-        kelompok: kelompok == 'k1'? "Kelompok 1" : "Kelompok 2",
-        potensi: item.potensi || 0,
-        kode: item.kode || '',
-        proses: 'Belum Input',
-        skor: (typeof item.skor === 'number') ? item.skor : (Number(item.baseSkor) || 0),
-        tglSp2: '',
-        jatuhTempo: ''
-    };
     
-    switch(timId) {
-        case "tim-ia": {
-            const team = timData.k1.find(t => t.id === 'tim-ia');
-            if (team) team.bebanKerja += item.skor;
-            break;
-        }
-        case "tim-ib": {
-            const team = timData.k1.find(t => t.id === 'tim-ib');
-            if (team) team.bebanKerja += item.skor;
-            break;
-        }
-        case "tim-ic": {
-            const team = timData.k1.find(t => t.id === 'tim-ic');
-            if (team) team.bebanKerja += item.skor;
-            break;
-        }
-        case "tim-iia": {
-            const team = timData.k2.find(t => t.id === 'tim-iia');
-            if (team) team.bebanKerja += item.skor;
-            break;
-        }
-        case "tim-iib": {
-            const team = timData.k2.find(t => t.id === 'tim-iib');
-            if (team) team.bebanKerja += item.skor;
-            break;
-        }
-        case "tim-iic": {
-            const team = timData.k2.find(t => t.id === 'tim-iic');
-            if (team) team.bebanKerja += item.skor;
-            break;
-        }
-        default:
-            break;
+    let item = np2BelumSp2Data.find(item => item.np2 === String(np2));
+    
+    if (!item) {
+        showToast('✕ Item NP2 tidak ditemukan', 'red');
+        return;
     }
-
-    np2BelumSp2Data = np2BelumSp2Data.filter(item => item.np2 !== np2);
-    sp2BelumLhp.push(sp2obj);
-
-    closeModal('modal-assign');
-    showToast(`✓ ${np2} berhasil di-assign ke ${timText}`, 'green');
-
-    logData.unshift({
-        aksi: 'Assignment',
-        icon: '⊕',
-        color: 'var(--blue)',
-        entitas: np2,
-        detail: `${np2} (${document.getElementById('modal-wp').textContent}) di-assign ke ${timText} oleh Admin P3`,
-        waktu: new Date().toISOString().replace('T',' ').slice(0,19)
-    });
     
-
+    // ADMIN: Assign ke Kelompok
+    if (currentUser.role === 'admin') {
+        const kelompok = document.getElementById('sel-kelompok').value;
+        if (!kelompok) { 
+            showToast('⚠ Pilih kelompok terlebih dahulu', 'amber'); 
+            return; 
+        }
+        
+        // Update NP2 item dengan kelompok
+        item.kelompok = kelompok === 'k1' ? 'Kelompok I' : 'Kelompok II';
+        item.kelompokId = kelompok;
+        
+        showToast(`✓ ${np2} berhasil di-assign ke ${item.kelompok}`, 'green');
+        
+        logData.unshift({
+            aksi: 'Assignment Kelompok',
+            icon: '⊕',
+            color: 'var(--blue)',
+            entitas: np2,
+            detail: `${np2} (${item.nama}) di-assign ke ${item.kelompok} oleh ${currentUser.name}`,
+            waktu: new Date().toISOString().replace('T',' ').slice(0,19)
+        });
+    }
+    // SPV: Assign ke Tim
+    else if (currentUser.role === 'spv') {
+        const timId = document.getElementById('sel-tim').value;
+        const timText = document.getElementById('sel-tim').options[document.getElementById('sel-tim').selectedIndex]?.text?.split(' — ')[0] || '';
+        
+        if (!timId) { 
+            showToast('⚠ Pilih tim terlebih dahulu', 'amber'); 
+            return; 
+        }
+        
+        const kelompok = currentUser.kelompok;
+        const timObject = timData[kelompok]?.find(t => t.id === timId);
+        
+        if (!timObject) {
+            showToast('✕ Tim tidak ditemukan', 'red');
+            return;
+        }
+        
+        // Check if NP2 is assigned to SPV's kelompok
+        if (!item.kelompokId || item.kelompokId !== kelompok) {
+            showToast('✕ NP2 ini belum di-assign ke kelompok Anda', 'red');
+            return;
+        }
+        
+        // Increment kasus count
+        timObject.kasus += 1;
+        
+        // Create SP2 object
+        const sp2obj = {
+            sp2: '',
+            np2: item.np2 || '',
+            npwp: item.npwp || '',
+            nama: item.nama || '',
+            jenis: item.jenis || '',
+            tipe: item.tipe || '',
+            tim: timText,
+            kelompok: item.kelompok,
+            potensi: item.potensi || 0,
+            kode: item.kode || '',
+            proses: 'Belum Input',
+            skor: (typeof item.skor === 'number') ? item.skor : (Number(item.baseSkor) || 0),
+            tglSp2: '',
+            jatuhTempo: ''
+        };
+        
+        // Update beban kerja
+        switch(timId) {
+            case "tim-ia": 
+            case "tim-ib": 
+            case "tim-ic": {
+                const team = timData.k1.find(t => t.id === timId);
+                if (team) team.bebanKerja += item.skor;
+                break;
+            }
+            case "tim-iia": 
+            case "tim-iib": 
+            case "tim-iic": {
+                const team = timData.k2.find(t => t.id === timId);
+                if (team) team.bebanKerja += item.skor;
+                break;
+            }
+        }
+        
+        // Remove from NP2 queue and add to SP2
+        np2BelumSp2Data = np2BelumSp2Data.filter(item => item.np2 !== np2);
+        sp2BelumLhp.push(sp2obj);
+        
+        showToast(`✓ ${np2} berhasil di-assign ke ${timText}`, 'green');
+        
+        logData.unshift({
+            aksi: 'Assignment Tim',
+            icon: '⊕',
+            color: 'var(--blue)',
+            entitas: np2,
+            detail: `${np2} (${item.nama}) di-assign ke ${timText} oleh ${currentUser.name}`,
+            waktu: new Date().toISOString().replace('T',' ').slice(0,19)
+        });
+    }
+    
+    closeModal('modal-assign');
     filterAntrian();
     renderDashboard();
-    renderTimCards('k1', 'tim-cards-k1');
-    renderTimCards('k2', 'tim-cards-k2');
+    renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
+    renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
     renderBebanKerja();
     renderBebanKerjaSummary();
     renderLog();
@@ -1260,8 +1408,8 @@ function autoAssignAll() {
     np2BelumSp2Data = [];
     filterAntrian();
     renderDashboard();
-    renderTimCards('k1', 'tim-cards-k1');
-    renderTimCards('k2', 'tim-cards-k2');
+    renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
+    renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
     renderBebanKerja();
     renderBebanKerjaSummary();
     renderLog();
@@ -1573,8 +1721,8 @@ function showToast(msg, type='green') {
 document.addEventListener('DOMContentLoaded', function() {
     renderDashboard();
     renderAntrianTabel(np2BelumSp2Data);
-    renderTimCards('k1', 'tim-cards-k1');
-    renderTimCards('k2', 'tim-cards-k2');
+    renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
+    renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
     renderBebanKerja();
     renderBebanKerjaSummary();
     
@@ -1586,14 +1734,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     renderLog();
     attachTableSorting();
+    
+    // Close user dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('user-dropdown');
+        const userChip = document.querySelector('.user-chip');
+        if (dropdown && userChip && !userChip.contains(event.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
 });
 
 // ========== INIT ==========
 function init() {
     renderKasusTabel(sp2BelumLhp);
     renderDashboard();
-    renderTimCards('k1', 'tim-cards-k1');
-    renderTimCards('k2', 'tim-cards-k2');
+    renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
+    renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
     renderBebanKerja();
     renderBebanKerjaSummary();
     

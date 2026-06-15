@@ -40,12 +40,31 @@
           <span class="nav-icon">≡</span> Log Aktivitas
         </div>
       </nav>
-      <div class="sidebar-footer">
-        <div class="user-chip">
-          <div class="user-avatar">AD</div>
+
+      <div class="sidebar-footer" style="position:relative;">
+        <div class="user-chip" onclick="toggleUserDropdown()" style="cursor:pointer;">
+          <div class="user-avatar" id="user-avatar">AD</div>
           <div>
-            <div class="user-name">Admin P3</div>
-            <div class="user-role">Administrator</div>
+            <div class="user-name" id="user-name">Admin P3</div>
+            <div class="user-role" id="user-role">Administrator</div>
+          </div>
+          <div style="margin-left:auto; font-size:12px;">▼</div>
+        </div>
+        
+        <div class="user-dropdown" id="user-dropdown" style="display:none; position:absolute; bottom:60px; left:8px; right:8px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); z-index:200;">
+          <div class="user-option" onclick="switchUser('admin')" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); font-size:12px; color:var(--text2);">
+            <div style="font-weight:500; color:var(--text);">👤 Admin P3</div>
+            <div style="font-size:10px; color:var(--text3);">Assign ke Kelompok</div>
+          </div>
+          
+          <div class="user-option" onclick="switchUser('spv1')" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); font-size:12px; color:var(--text2);">
+            <div style="font-weight:500; color:var(--text);">👤 SPV Kelompok I</div>
+            <div style="font-size:10px; color:var(--text3);">Assign ke Tim K1</div>
+          </div>
+          
+          <div class="user-option" onclick="switchUser('spv2')" style="padding:8px 12px; cursor:pointer; font-size:12px; color:var(--text2);">
+            <div style="font-weight:500; color:var(--text);">👤 SPV Kelompok II</div>
+            <div style="font-size:10px; color:var(--text3);">Assign ke Tim K2</div>
           </div>
         </div>
       </div>
@@ -288,11 +307,33 @@
 
             <div class="card">
               <div class="section-title" style="margin-bottom:12px;">👥 Status Beban Kerja Tim</div>
-              <div style="display:flex; flex-direction:column; gap:10px;">
-                <div class="kelompok-header"><div><div class="kh-name">Kelompok I — SPV: Kadi Wartono</div></div></div>
-                <div id="tim-cards-k1"></div>
-                <div class="kelompok-header" style="margin-top:8px;"><div><div class="kh-name">Kelompok II — SPV: Agus Sukoco</div></div></div>
-                <div id="tim-cards-k2"></div>
+              
+              <div id="assign-dist-k1" style="margin-bottom:20px;">
+                <div class="kelompok-header">
+                  <div>
+                    <div class="kh-name">Kelompok I</div>
+
+                    <div class="kh-spv">SPV: Kadi Wartono</div>
+                  </div>
+
+                  <span id="assign-total-k1" class="badge badge-amber">0 Kasus</span>
+                </div>
+
+                <div id="assign-bars-k1" class="bar-chart"></div>
+              </div>
+
+              <div id="assign-dist-k2">
+                <div class="kelompok-header">
+                  <div>
+                    <div class="kh-name">Kelompok II</div>
+
+                    <div class="kh-spv">SPV: Agus Sukoco</div>
+                  </div>
+
+                  <span id="assign-total-k2" class="badge badge-green">0 Kasus</span>
+                </div>
+
+                <div id="assign-bars-k2" class="bar-chart"></div>
               </div>
             </div>
           </div>
@@ -397,7 +438,7 @@
     <div class="modal-overlay" id="modal-assign">
       <div class="modal">
         <div class="modal-header">
-          <div class="modal-title">Assign Kasus ke Tim</div>
+          <div class="modal-title" id="modal-assign-title">Assign Kasus ke Tim</div>
 
           <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-assign')">✕</button>
         </div>

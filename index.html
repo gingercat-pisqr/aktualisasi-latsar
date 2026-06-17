@@ -277,7 +277,10 @@
               <div class="section-sub">Assign kasus dari tabel NP2 belum SP2 ke tim pemeriksa</div>
             </div>
 
-            <button class="btn btn-primary" onclick="autoAssignAll()">⚡ Auto-Assign Semua</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="autoAssignAll()">⚡ Auto-Assign Semua</button>
+              <button class="btn btn-ghost" onclick="exportAssignedNP2ToCSV()" title="Unduh NP2 yang sudah di-assign ke kelompok">↓ Unduh NP2 Assigned</button>
+            </div>
           </div>
 
           <div class="grid-2">
@@ -335,6 +338,29 @@
 
                 <div id="assign-bars-k2" class="bar-chart"></div>
               </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:24px;">
+            <div class="section-header">
+              <div>
+                <div class="section-title">✓ NP2 Sudah Diassign ke Kelompok</div>
+                <div class="section-sub">Data yang sudah di-assign oleh Admin ke kelompok untuk selanjutnya di-assign ke tim</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="exportAssignedNP2ToCSV()">↓ Unduh CSV</button>
+            </div>
+
+            <div class="filter-bar">
+              <input type="text" placeholder="Cari NP2 / Nama WP..." id="search-assigned" oninput="filterAssignedNP2()" style="width:100%">
+            </div>
+
+            <div class="tbl-wrap" style="max-height:30rem; overflow-y:auto;">
+              <table class="tbl" id="assigned-np2-table">
+                <thead><tr>
+                  <th>NP2</th><th>Nama WP</th><th>NPWP</th><th>Jenis</th><th>Tipe</th><th>Potensi</th><th>Kode</th><th>Skor</th><th>Kelompok</th>
+                </tr></thead>
+                <tbody id="assigned-np2-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>

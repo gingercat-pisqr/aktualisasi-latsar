@@ -204,6 +204,7 @@ const server = https.createServer(options, (req, res) => {
 });
 
 const PORT = 3000;
+
 server.listen(PORT, () => {
     console.log(`Secure server is running at https://localhost:${PORT}`);
 });

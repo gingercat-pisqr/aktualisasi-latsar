@@ -79,6 +79,7 @@ function switchUser(userId) {
     
     // Refresh dashboard
     renderDashboard();
+    renderAssignedNP2Table();
     renderLog();
     
     showToast(`✓ Berhasil login sebagai ${currentUser.name}`, 'green');
@@ -1040,6 +1041,84 @@ function renderLog() {
     `).join('');
 }
 
+function renderAssignedNP2Table() {
+    const tbody = document.getElementById('assigned-np2-tbody');
+    if (!tbody) return;
+    
+    // Get data based on user role
+    let assignedData = [];
+    if (currentUser.role === 'admin') {
+        // Admin melihat semua data yang sudah di-assign ke kelompok
+        assignedData = np2BelumSp2Data.filter(item => item.kelompokId);
+    } else if (currentUser.role === 'spv') {
+        // SPV hanya melihat data yang di-assign ke kelompok mereka
+        assignedData = np2BelumSp2Data.filter(item => item.kelompokId === currentUser.kelompok);
+    }
+    
+    if (!assignedData.length) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text3); padding:20px;">Tidak ada data NP2 yang sudah di-assign</td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = assignedData.map(item => `
+        <tr>
+            <td class="mono" style="font-size:11px;">${item.np2}</td>
+            <td style="font-size:11px; max-width:12rem; overflow:hidden; text-overflow:ellipsis;">${item.nama}</td>
+            <td class="mono" style="font-size:10px;">${item.npwp}</td>
+            <td style="font-size:11px;">${renderJenisBadge(item.jenis)}</td>
+            <td style="font-size:11px;">${String(item.tipe || '').toLowerCase().includes('badan') ? '<span class="badge badge-purple">Badan</span>' : '<span class="badge badge-gray">OP</span>'}</td>
+            <td class="mono" style="font-size:10px;">${item.potensi.toLocaleString ? item.potensi.toLocaleString('id-ID', {style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0,}) : item.potensi}</td>
+            <td style="font-size:11px;">${renderKodeBadge(item.kode)}</td>
+            <td style="font-size:11px;">${item.skor}</td>
+            <td style="font-size:11px;"><span class="badge ${item.kelompokId === 'k1' ? 'badge-blue' : 'badge-teal'}">${item.kelompok}</span></td>
+        </tr>
+    `).join('');
+}
+
+function filterAssignedNP2() {
+    const query = document.getElementById('search-assigned')?.value?.toLowerCase() || '';
+    let assignedData = [];
+    
+    if (currentUser.role === 'admin') {
+        assignedData = np2BelumSp2Data.filter(item => item.kelompokId);
+    } else if (currentUser.role === 'spv') {
+        assignedData = np2BelumSp2Data.filter(item => item.kelompokId === currentUser.kelompok);
+    }
+    
+    if (!query) {
+        renderAssignedNP2Table();
+        return;
+    }
+    
+    const filteredData = assignedData.filter(item => 
+        item.np2.toLowerCase().includes(query) || 
+        item.nama.toLowerCase().includes(query) ||
+        item.npwp.includes(query)
+    );
+    
+    const tbody = document.getElementById('assigned-np2-tbody');
+    if (!tbody) return;
+    
+    if (!filteredData.length) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text3); padding:20px;">Tidak ada hasil pencarian</td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = filteredData.map(item => `
+        <tr>
+            <td class="mono" style="font-size:11px;">${item.np2}</td>
+            <td style="font-size:11px; max-width:12rem; overflow:hidden; text-overflow:ellipsis;">${item.nama}</td>
+            <td class="mono" style="font-size:10px;">${item.npwp}</td>
+            <td style="font-size:11px;">${renderJenisBadge(item.jenis)}</td>
+            <td style="font-size:11px;">${String(item.tipe || '').toLowerCase().includes('badan') ? '<span class="badge badge-purple">Badan</span>' : '<span class="badge badge-gray">OP</span>'}</td>
+            <td class="mono" style="font-size:10px;">${item.potensi.toLocaleString ? item.potensi.toLocaleString('id-ID', {style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0,}) : item.potensi}</td>
+            <td style="font-size:11px;">${renderKodeBadge(item.kode)}</td>
+            <td style="font-size:11px;">${item.skor}</td>
+            <td style="font-size:11px;"><span class="badge ${item.kelompokId === 'k1' ? 'badge-blue' : 'badge-teal'}">${item.kelompok}</span></td>
+        </tr>
+    `).join('');
+}
+
 // ========== NAVIGATION ==========
 const pageTitles = {
     dashboard: 'Dasbor', kasus: 'Kasus Aktif per Tim',
@@ -1060,6 +1139,7 @@ function showPage(id) {
         renderDashboard();
     } else if(id === 'assign') {
         renderAntrianTabel(np2BelumSp2Data);
+        renderAssignedNP2Table();
         renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
         renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
         renderBebanKerja();
@@ -1312,6 +1392,7 @@ function confirmAssign() {
     closeModal('modal-assign');
     filterAntrian();
     renderDashboard();
+    renderAssignedNP2Table();
     renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
     renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
     renderBebanKerja();
@@ -1717,10 +1798,111 @@ function showToast(msg, type='green') {
     setTimeout(() => t.classList.remove('show'), 3000);
 }
 
+// ========== EXPORT FUNCTIONS ==========
+function convertToCSV(data, headers) {
+    // Escape quotes and wrap fields with quotes if they contain special characters
+    const escapeCSVField = (field) => {
+        if (field === null || field === undefined) return '';
+        const str = String(field).trim();
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+    };
+    
+    // Create header row
+    const headerRow = headers.map(escapeCSVField).join(',');
+    
+    // Create data rows
+    const dataRows = data.map(item => 
+        headers.map(header => escapeCSVField(item[header] || '')).join(',')
+    );
+    
+    return [headerRow, ...dataRows].join('\n');
+}
+
+function downloadCSV(csv, filename) {
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`✓ File ${filename} berhasil diunduh`, 'green');
+}
+
+function exportAssignedNP2ToCSV() {
+    // Filter data berdasarkan role user
+    let dataToExport = [];
+    
+    if (currentUser.role === 'admin') {
+        // Admin bisa export semua data yang sudah di-assign ke kelompok
+        dataToExport = np2BelumSp2Data.filter(item => item.kelompokId);
+    } else if (currentUser.role === 'spv') {
+        // SPV hanya bisa export data yang di-assign ke kelompok mereka
+        dataToExport = np2BelumSp2Data.filter(item => item.kelompokId === currentUser.kelompok);
+    }
+    
+    if (!dataToExport.length) {
+        showToast('⚠ Tidak ada data NP2 yang sudah di-assign untuk diekspor', 'amber');
+        return;
+    }
+    
+    // Define CSV headers (sesuai dengan field yang diimport)
+    const headers = ['np2', 'npwp', 'nama', 'jenis pemeriksaan', 'kode pemeriksaan', 'tipe', 'potensi', 'skor', 'isProminent'];
+    
+    // Map data ke struktur CSV
+    const csvData = dataToExport.map(item => ({
+        'np2': item.np2 || '',
+        'npwp': item.npwp || '',
+        'nama': item.nama || '',
+        'jenis pemeriksaan': item.jenis || '',
+        'kode pemeriksaan': item.kode || '',
+        'tipe': item.tipe || '',
+        'potensi': item.potensi || '',
+        'skor': item.skor || '',
+        'isProminent': item.isProminent ? 'true' : 'false'
+    }));
+    
+    // Convert to CSV
+    const csv = convertToCSV(csvData, headers);
+    
+    // Generate filename dengan timestamp dan user role
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '');
+    const userLabel = currentUser.role === 'admin' 
+        ? 'AllKelompok' 
+        : `Kelompok_${currentUser.kelompok === 'k1' ? 'I' : 'II'}`;
+    const filename = `NP2_Assigned_${userLabel}_${dateStr}_${timeStr}.csv`;
+    
+    // Download file
+    downloadCSV(csv, filename);
+    
+    // Log activity
+    logData.unshift({
+        aksi: 'Export NP2',
+        icon: '📥',
+        color: 'var(--amber)',
+        entitas: filename,
+        detail: `${dataToExport.length} data NP2 diekspor oleh ${currentUser.name}`,
+        waktu: new Date().toISOString().replace('T',' ').slice(0,19)
+    });
+    
+    renderLog();
+}
+
 // ========== INITIALIZATION ==========
 document.addEventListener('DOMContentLoaded', function() {
     renderDashboard();
     renderAntrianTabel(np2BelumSp2Data);
+    renderAssignedNP2Table();
     renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
     renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
     renderBebanKerja();
@@ -1749,6 +1931,8 @@ document.addEventListener('DOMContentLoaded', function() {
 function init() {
     renderKasusTabel(sp2BelumLhp);
     renderDashboard();
+    renderAntrianTabel(np2BelumSp2Data);
+    renderAssignedNP2Table();
     renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
     renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
     renderBebanKerja();

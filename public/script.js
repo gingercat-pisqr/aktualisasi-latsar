@@ -152,6 +152,122 @@ function renderKodeBadge(kode) {
     return `<span class="badge badge-kode">${kode}</span>`;
 }
 
+function canRollbackTeam(item) {
+    if (!item || !item.kelompok) return false;
+    if (item.proses === 'Sudah LHP') return false;
+    if (currentUser.role === 'admin') return true;
+    if (currentUser.role === 'spv') {
+        const kelompokNama = currentUser.kelompok === 'k1' ? 'Kelompok I' : 'Kelompok II';
+        return item.kelompok === kelompokNama;
+    }
+    return false;
+}
+
+function rollbackGroupAssignment(np2) {
+    const item = np2BelumSp2Data.find(i => i.np2 === np2);
+    if (!item || !item.kelompokId) {
+        showToast('⚠ Data tidak ditemukan atau belum di-assign ke kelompok', 'amber');
+        return;
+    }
+    if (currentUser.role !== 'admin') {
+        showToast('✕ Hanya Administrator dapat membatalkan assignment kelompok', 'red');
+        return;
+    }
+    if (!confirm(`Yakin membatalkan assignment ${np2} dari ${item.kelompok}?`)) return;
+
+    const oldGroup = item.kelompok;
+    delete item.kelompokId;
+    item.kelompok = '';
+
+    showToast(`✓ Assignment ${np2} ke ${oldGroup} dibatalkan`, 'green');
+    logData.unshift({
+        aksi: 'Rollback Kelompok',
+        icon: '↺',
+        color: 'var(--red)',
+        entitas: np2,
+        detail: `${np2} (${item.nama}) rollback assignment dari ${oldGroup} oleh ${currentUser.name}`,
+        waktu: new Date().toISOString().replace('T',' ').slice(0,19)
+    });
+
+    renderDashboard();
+    renderAssignedNP2Table();
+    renderLog();
+}
+
+function rollbackTeamAssignment(np2) {
+    const index = sp2BelumLhp.findIndex(i => i.np2 === np2);
+    if (index < 0) {
+        showToast('⚠ Data SP2 tidak ditemukan', 'amber');
+        return;
+    }
+
+    const item = sp2BelumLhp[index];
+    if (item.proses === 'Sudah LHP') {
+        showToast('✕ Kasus sudah selesai, rollback tidak diperbolehkan', 'red');
+        return;
+    }
+
+    if (currentUser.role === 'spv') {
+        const allowed = currentUser.kelompok === 'k1' ? 'Kelompok I' : 'Kelompok II';
+        if (item.kelompok !== allowed) {
+            showToast('✕ Hanya kasus dari kelompok Anda yang dapat dibatalkan', 'red');
+            return;
+        }
+    }
+
+    if (currentUser.role !== 'admin' && currentUser.role !== 'spv') {
+        showToast('✕ Hanya Administrator atau SPV dapat membatalkan assignment tim', 'red');
+        return;
+    }
+
+    if (!confirm(`Yakin membatalkan assignment tim ${np2} dari ${item.tim}?`)) return;
+
+    const score = Number(item.skor) || 0;
+    const teamObj = Object.values(timData).flat().find(t => t.name === item.tim);
+    if (teamObj) {
+        teamObj.kasus = Math.max(0, teamObj.kasus - 1);
+        teamObj.bebanKerja = Math.max(0, teamObj.bebanKerja - score);
+    }
+
+    const np2Item = {
+        np2: item.np2 || '',
+        npwp: item.npwp || '',
+        nama: item.nama || '',
+        jenis: item.jenis || '',
+        tipe: item.tipe || '',
+        potensi: item.potensi || 0,
+        kode: item.kode || '',
+        skor: score,
+        baseSkor: item.baseSkor || score,
+        isProminent: false,
+        kelompok: item.kelompok || '',
+        kelompokId: item.kelompok === 'Kelompok I' ? 'k1' : item.kelompok === 'Kelompok II' ? 'k2' : undefined
+    };
+
+    np2BelumSp2Data.unshift(np2Item);
+    sp2BelumLhp.splice(index, 1);
+
+    showToast(`✓ Assignment tim ${np2} dibatalkan`, 'green');
+    logData.unshift({
+        aksi: 'Rollback Tim',
+        icon: '↺',
+        color: 'var(--red)',
+        entitas: np2,
+        detail: `${np2} (${item.nama}) rollback assignment dari ${item.tim} oleh ${currentUser.name}`,
+        waktu: new Date().toISOString().replace('T',' ').slice(0,19)
+    });
+
+    renderDashboard();
+    renderKasusTabel(sp2BelumLhp);
+    renderAssignedNP2Table();
+    renderAntrianTabel(np2BelumSp2Data);
+    renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
+    renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
+    renderBebanKerja();
+    renderBebanKerjaSummary();
+    renderLog();
+}
+
 function getAntrianDataByRole() {
     if (currentUser.role === 'admin') {
         // Admin sees NP2 that haven't been assigned to any kelompok
@@ -1056,7 +1172,7 @@ function renderAssignedNP2Table() {
     }
     
     if (!assignedData.length) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text3); padding:20px;">Tidak ada data NP2 yang sudah di-assign</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text3); padding:20px;">Tidak ada data NP2 yang sudah di-assign</td></tr>`;
         return;
     }
     
@@ -1071,6 +1187,9 @@ function renderAssignedNP2Table() {
             <td style="font-size:11px;">${renderKodeBadge(item.kode)}</td>
             <td style="font-size:11px;">${item.skor}</td>
             <td style="font-size:11px;"><span class="badge ${item.kelompokId === 'k1' ? 'badge-blue' : 'badge-teal'}">${item.kelompok}</span></td>
+            <td style="font-size:11px;">
+                ${currentUser.role === 'admin' ? `<button class="btn btn-danger btn-sm" onclick="rollbackGroupAssignment('${item.np2}')">Rollback</button>` : '<span style="color:var(--text3); font-size:11px;">-</span>'}
+            </td>
         </tr>
     `).join('');
 }
@@ -1434,67 +1553,120 @@ function autoAssignAll() {
         return;
     }
 
-    const teams = Object.values(timData).flat();
-    const assignedCount = np2BelumSp2Data.length;
-    const assignmentSummary = {};
+    if (currentUser.role === 'admin') {
+        const unassigned = np2BelumSp2Data.filter(item => !item.kelompokId);
+        if (!unassigned.length) {
+            showToast('⚠ Tidak ada NP2 yang belum di-assign ke kelompok', 'amber');
+            return;
+        }
 
-    // For each NP2, pick lowest-load team, increment its kasus, and convert NP2 -> SP2 entry
-    np2BelumSp2Data.forEach(item => {
-        teams.sort((a, b) => a.kasus - b.kasus || a.name.localeCompare(b.name));
-        const target = teams[0];
-        target.kasus += 1;
-        
-        // determine kelompok by checking team id membership
-        const kelompok = (timData.k1 || []).some(t => t.id === target.id) ? 'Kelompok I' : 'Kelompok II';
-        
-        // create SP2-like object from NP2 item
-        const sp2obj = {
-            sp2: '',
-            np2: item.np2 || '',
-            npwp: item.npwp || '',
-            nama: item.nama || '',
-            jenis: item.jenis || '',
-            tipe: item.tipe || '',
-            tim: target.name,
-            kelompok: kelompok,
-            potensi: item.potensi || 0,
-            kode: item.kode || '',
-            proses: 'Belum Input',
-            skor: (typeof item.skor === 'number') ? item.skor : (Number(item.baseSkor) || 0),
-            tglSp2: '',
-            jatuhTempo: ''
+        const groupCounts = {
+            k1: np2BelumSp2Data.filter(item => item.kelompokId === 'k1').length,
+            k2: np2BelumSp2Data.filter(item => item.kelompokId === 'k2').length
         };
 
-        target.bebanKerja += sp2obj.skor;
+        const assignmentSummary = { 'Kelompok I': 0, 'Kelompok II': 0 };
 
-        sp2BelumLhp.push(sp2obj);
+        unassigned.forEach(item => {
+            const targetGroup = groupCounts.k1 <= groupCounts.k2 ? 'k1' : 'k2';
+            const kelompokName = targetGroup === 'k1' ? 'Kelompok I' : 'Kelompok II';
 
-        assignmentSummary[target.name] = (assignmentSummary[target.name] || 0) + 1;
-    });
+            item.kelompokId = targetGroup;
+            item.kelompok = kelompokName;
 
-    const assignmentText = Object.entries(assignmentSummary)
-        .map(([name, count]) => `${name} (${count})`)
-        .join(', ');
+            groupCounts[targetGroup] += 1;
+            assignmentSummary[kelompokName] += 1;
+        });
 
-    logData.unshift({
-        aksi: 'Auto-Assign',
-        icon: '⚡',
-        color: 'var(--amber)',
-        entitas: `Batch ${assignedCount}`,
-        detail: `Auto-assign ${assignedCount} kasus NP2 pada tim beban terendah: ${assignmentText}`,
-        waktu: new Date().toISOString().replace('T',' ').slice(0,19)
-    });
+        const assignmentText = Object.entries(assignmentSummary)
+            .filter(([, count]) => count > 0)
+            .map(([name, count]) => `${name} (${count})`)
+            .join(', ');
 
-    // clear NP2 queue
-    np2BelumSp2Data = [];
-    filterAntrian();
-    renderDashboard();
-    renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
-    renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
-    renderBebanKerja();
-    renderBebanKerjaSummary();
-    renderLog();
-    showToast(`✓ ${assignedCount} kasus berhasil di-assign`, 'green');
+        logData.unshift({
+            aksi: 'Auto-Assign',
+            icon: '⚡',
+            color: 'var(--amber)',
+            entitas: `Batch ${unassigned.length}`,
+            detail: `Auto-assign ${unassigned.length} NP2 ke kelompok: ${assignmentText}`,
+            waktu: new Date().toISOString().replace('T',' ').slice(0,19)
+        });
+
+        filterAntrian();
+        renderDashboard();
+        renderAssignedNP2Table();
+        renderLog();
+        showToast(`✓ ${unassigned.length} NP2 berhasil di-assign ke kelompok`, 'green');
+        return;
+    }
+
+    if (currentUser.role === 'spv') {
+        const kelompok = currentUser.kelompok;
+        const groupItems = np2BelumSp2Data.filter(item => item.kelompokId === kelompok);
+
+        if (!groupItems.length) {
+            showToast('⚠ Tidak ada NP2 yang sudah di-assign ke kelompok Anda untuk di-assign ke tim', 'amber');
+            return;
+        }
+
+        const teams = [...(timData[kelompok] || [])];
+        const assignedCount = groupItems.length;
+        const assignmentSummary = {};
+
+        groupItems.forEach(item => {
+            teams.sort((a, b) => a.kasus - b.kasus || a.name.localeCompare(b.name));
+            const target = teams[0];
+            target.kasus += 1;
+            target.bebanKerja += Number(item.skor) || 0;
+
+            const sp2obj = {
+                sp2: '',
+                np2: item.np2 || '',
+                npwp: item.npwp || '',
+                nama: item.nama || '',
+                jenis: item.jenis || '',
+                tipe: item.tipe || '',
+                tim: target.name,
+                kelompok: item.kelompok,
+                potensi: item.potensi || 0,
+                kode: item.kode || '',
+                proses: 'Belum Input',
+                skor: (typeof item.skor === 'number') ? item.skor : (Number(item.baseSkor) || 0),
+                tglSp2: '',
+                jatuhTempo: ''
+            };
+
+            sp2BelumLhp.push(sp2obj);
+            assignmentSummary[target.name] = (assignmentSummary[target.name] || 0) + 1;
+        });
+
+        np2BelumSp2Data = np2BelumSp2Data.filter(item => item.kelompokId !== kelompok);
+
+        const assignmentText = Object.entries(assignmentSummary)
+            .map(([name, count]) => `${name} (${count})`)
+            .join(', ');
+
+        logData.unshift({
+            aksi: 'Auto-Assign',
+            icon: '⚡',
+            color: 'var(--amber)',
+            entitas: `Batch ${assignedCount}`,
+            detail: `Auto-assign ${assignedCount} NP2 ke tim ${currentUser.kelompok === 'k1' ? 'Kelompok I' : 'Kelompok II'}: ${assignmentText}`,
+            waktu: new Date().toISOString().replace('T',' ').slice(0,19)
+        });
+
+        filterAntrian();
+        renderDashboard();
+        renderTimCards('k1', 'assign-bars-k1', 'assign-total-k1');
+        renderTimCards('k2', 'assign-bars-k2', 'assign-total-k2');
+        renderBebanKerja();
+        renderBebanKerjaSummary();
+        renderLog();
+        showToast(`✓ ${assignedCount} NP2 berhasil di-assign ke tim`, 'green');
+        return;
+    }
+
+    showToast('✕ Role tidak dikenali untuk auto-assign', 'red');
 }
 
 async function getNP2BelumSP2(cookieValue) {
@@ -1895,6 +2067,41 @@ function exportAssignedNP2ToCSV() {
         waktu: new Date().toISOString().replace('T',' ').slice(0,19)
     });
     
+    renderLog();
+}
+
+function exportLogToCSV() {
+    if (!logData.length) {
+        showToast('⚠ Tidak ada log aktivitas untuk diekspor', 'amber');
+        return;
+    }
+
+    const headers = ['aksi', 'icon', 'entitas', 'detail', 'waktu'];
+    const csvData = logData.map(item => ({
+        aksi: item.aksi || '',
+        icon: item.icon || '',
+        entitas: item.entitas || '',
+        detail: item.detail || '',
+        waktu: item.waktu || ''
+    }));
+
+    const csv = convertToCSV(csvData, headers);
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '');
+    const filename = `Log_Aktivitas_${currentUser.id || 'user'}_${dateStr}_${timeStr}.csv`;
+
+    downloadCSV(csv, filename);
+
+    logData.unshift({
+        aksi: 'Export Log',
+        icon: '📥',
+        color: 'var(--blue)',
+        entitas: filename,
+        detail: `Log aktivitas diekspor oleh ${currentUser.name}`,
+        waktu: new Date().toISOString().replace('T',' ').slice(0,19)
+    });
+
     renderLog();
 }
 

@@ -357,7 +357,7 @@
             <div class="tbl-wrap" style="max-height:30rem; overflow-y:auto;">
               <table class="tbl" id="assigned-np2-table">
                 <thead><tr>
-                  <th>NP2</th><th>Nama WP</th><th>NPWP</th><th>Jenis</th><th>Tipe</th><th>Potensi</th><th>Kode</th><th>Skor</th><th>Kelompok</th>
+                  <th>NP2</th><th>Nama WP</th><th>NPWP</th><th>Jenis</th><th>Tipe</th><th>Potensi</th><th>Kode</th><th>Skor</th><th>Kelompok</th><th>Aksi</th>
                 </tr></thead>
                 <tbody id="assigned-np2-tbody"></tbody>
               </table>
@@ -435,8 +435,9 @@
         <div style="padding:24px;">
           <div class="section-header">
             <div class="section-title">Log Aktivitas</div>
-            <button class="btn btn-ghost btn-sm">↓ Export CSV</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportLogToCSV()">↓ Export CSV</button>
           </div>
+          
           <div class="filter-bar">
             <input type="text" placeholder="Cari log..." style="width:220px">
             <select>

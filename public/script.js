@@ -729,7 +729,7 @@ function mapCsvRowToSp2BelumLhp(row) {
 
     const tipe = String(kodeRaw).at(-1) === '2' ? 'Badan' : 'OP';
     
-    const skor = menghitungBebanKerja(row, false);
+    const skor = menghitungBebanKerja(row, false, proses);
     
     if (proses !== "Sudah LHP") {
         switch(tim) {
@@ -859,7 +859,7 @@ function handleFileUpload(event) {
             const kanwil = lookupCSVField(row, ['kanwil']);
             const tipe = lookupCSVField(row, ['kode pemeriksaan']).at(-1) === '1' ? 'WP Badan' : 'WP OP';
             const potensiNumber = Number(String(potensi).replace(/[^0-9.-]/g, ''));
-            const skor = menghitungBebanKerja(row, true);;
+            const skor = menghitungBebanKerja(row, true, "NP2");
 
             imported.push({ np2, npwp, nama, jenis, kode, tipe, potensi, skor, baseSkor: skor, tanggalNp2, tanggalUsulan, noUsulan, masa, up2, kanwil, isProminent: false });
             TOTAL_KASUS += 1;
@@ -1702,8 +1702,8 @@ async function getNP2BelumSP2(cookieValue) {
                                 (item[7] == 1182 || item[7] == 1181 || item[7] == 2182? "Rutin LB" : "Lainnya")
                             )
                         ),
-                skor: menghitungBebanKerja(item, true),
-                baseSkor: menghitungBebanKerja(item, true),
+                skor: menghitungBebanKerja(item, true, "NP2"),
+                baseSkor: menghitungBebanKerja(item, true, "NP2"),
                 isProminent: false
                 })
             );
@@ -1729,7 +1729,7 @@ async function getNP2BelumSP2(cookieValue) {
     }
 }
 
-function menghitungBebanKerja(item, isNp2) {
+function menghitungBebanKerja(item, isNp2, proses) {
     let kode_pemeriksaan = Number(item["kode pemeriksaan"]);
     
     let bebanKerja = 0;
@@ -1754,23 +1754,25 @@ function menghitungBebanKerja(item, isNp2) {
         if (item[10] > 500000000) bebanKerja += 25;
 
     } else {
-        if (!kode_pemeriksaan) kode_pemeriksaan = item[8];
-
-        if (kode_pemeriksaan == 1182) bebanKerja = 100;
-
-        if (kode_pemeriksaan == 2182) bebanKerja = 85;
-
-        if (kode_pemeriksaan == 1181) bebanKerja = 75;
-
-        if (kode_pemeriksaan == 1462 || kode_pemeriksaan == 1452) bebanKerja = 60;
-
-        if (kode_pemeriksaan == 1461 || kode_pemeriksaan == 1451) bebanKerja = 50;
-
-        if (kode_pemeriksaan == 1162 || kode_pemeriksaan == 1172 || kode_pemeriksaan == 1171) bebanKerja = 40;
-
-        if (kode_pemeriksaan == 1122 || kode_pemeriksaan == 1121) bebanKerja = 20;
-                
-        if (item[23] > 500000000) bebanKerja += 25;
+        if (proses != "Sudah LHP") {
+            if (!kode_pemeriksaan) kode_pemeriksaan = item[8];
+    
+            if (kode_pemeriksaan == 1182) bebanKerja = 100;
+    
+            if (kode_pemeriksaan == 2182) bebanKerja = 85;
+    
+            if (kode_pemeriksaan == 1181) bebanKerja = 75;
+    
+            if (kode_pemeriksaan == 1462 || kode_pemeriksaan == 1452) bebanKerja = 60;
+    
+            if (kode_pemeriksaan == 1461 || kode_pemeriksaan == 1451) bebanKerja = 50;
+    
+            if (kode_pemeriksaan == 1162 || kode_pemeriksaan == 1172 || kode_pemeriksaan == 1171) bebanKerja = 40;
+    
+            if (kode_pemeriksaan == 1122 || kode_pemeriksaan == 1121) bebanKerja = 20;
+                    
+            if (item[23] > 500000000) bebanKerja += 25;
+        }
     }
 
     return bebanKerja;
@@ -1847,7 +1849,7 @@ async function getSP2BelumLHP(cookieValue) {
                     return result.toISOString().split('T')[0];
                 })(),
 
-                skor: menghitungBebanKerja(item, false),
+                skor: menghitungBebanKerja(item, false, item[22] !== null? "Sudah LHP" : "Belum LHP"),
             }));
             
             if (timData.k1.at(0).kasus == 0 && timData.k1.at(1).kasus == 0 && timData.k1.at(2).kasus == 0 &&
